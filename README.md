@@ -43,6 +43,18 @@ RRWR does not bundle story media inside the executable. It mounts a user-supplie
 
 ### Step 2: Installation (Linux)
 
+#### Arch Linux (One-Liner)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/criperrr/rrwr/main/scripts/install-arch.sh | bash
+```
+
+This installs the required Arch packages (`webkit2gtk-4.1`, `gtk3`, `libayatana-appindicator`, `librsvg`, `fuse2`), downloads the latest `.AppImage` release (or builds from source automatically if no release asset is published yet), and registers the desktop entry in `~/.local/share/applications/rrwr.desktop`. To force building from source locally, pass `--from-source`:
+
+```bash
+bash scripts/install-arch.sh --from-source
+```
+
 #### Ubuntu / Debian / Linux Mint / Pop!_OS (`.deb`)
 
 ```bash
