@@ -110,8 +110,10 @@ impl ArchiveStore {
 
     pub fn load_from_dir(asset_dir: &Path) -> Self {
         let data_dir = asset_dir.join("archive").join("data");
-        let story_archive = Self::load_story_archive(&data_dir.join("story.json"));
-        let (music_archive, music_raw) = Self::load_music_archive(&data_dir.join("music.json"));
+        let (story_path, music_path) = crate::imports::find_archive_data_files(asset_dir)
+            .unwrap_or_else(|| (data_dir.join("story.json"), data_dir.join("music.json")));
+        let story_archive = Self::load_story_archive(&story_path);
+        let (music_archive, music_raw) = Self::load_music_archive(&music_path);
 
         Self {
             story: Arc::new(StoryStore::new(story_archive)),
@@ -122,10 +124,12 @@ impl ArchiveStore {
 
     pub fn reload_from_dir(&self, asset_dir: &Path) {
         let data_dir = asset_dir.join("archive").join("data");
-        let story_archive = Self::load_story_archive(&data_dir.join("story.json"));
+        let (story_path, music_path) = crate::imports::find_archive_data_files(asset_dir)
+            .unwrap_or_else(|| (data_dir.join("story.json"), data_dir.join("music.json")));
+        let story_archive = Self::load_story_archive(&story_path);
         self.story.reload_base(story_archive);
 
-        let (music_archive, music_raw) = Self::load_music_archive(&data_dir.join("music.json"));
+        let (music_archive, music_raw) = Self::load_music_archive(&music_path);
         *self.music.write().unwrap() = Arc::new(music_archive);
         *self.music_raw.write().unwrap() = Arc::new(music_raw);
     }

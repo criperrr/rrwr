@@ -246,10 +246,10 @@
       .replace(/\u2028/g, '\\u2028')
       .replace(/\u2029/g, '\\u2029');
 
-    // Canonical self-hosted Ruffle bundle path inside Asset Pack
+    // Canonical self-hosted Ruffle bundle path (resolved by VFS fallback across imods/custom-assets)
     const ruffleJsUrl = cleanBase
-      ? `${cleanBase}/assets/archive/imods/_ruffle_bundle/js/ruffle/ruffle.js`
-      : '/assets/archive/imods/_ruffle_bundle/js/ruffle/ruffle.js';
+      ? `${cleanBase}/assets/js/ruffle/ruffle.js`
+      : '/assets/js/ruffle/ruffle.js';
 
     const ruffleDirUrl = ruffleJsUrl.replace(/\/[^\/]*$/, '/');
 

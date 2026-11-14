@@ -1511,6 +1511,7 @@
         storyParagraph.className = 'storyParagraph';
         textContainer.appendChild(storyParagraph);
       }
+      storyParagraph.removeAttribute('style');
       storyParagraph.innerHTML = rewriteHtmlContent(rawContent);
       bindInternalLinks(storyParagraph);
     } else if (textContainer.childElementCount > 0 || textContainer.textContent !== '') {
@@ -1895,6 +1896,7 @@
             }
           }
         }
+        enhanceMediaContainers(mediaContainer);
       }
 
       // Text Content Rendering (Chatlogs, Author Notes, Paragraphs)
@@ -4704,7 +4706,15 @@
     applyTheme(computeActiveTheme(null, state.config.settings));
     const initialQuery = state.treeSearchQuery || "";
     const readingProgress = state.config?.settings?.readingProgress || {};
-    const currentProgress = readingProgress.current;
+    const firstPageId = (state.appInfo && state.appInfo.first_page_id)
+      ? String(state.appInfo.first_page_id)
+      : null;
+    let currentProgress = readingProgress.current;
+    let isFreshStart = false;
+    if (firstPageId && (!currentProgress || (currentProgress === '000001' && firstPageId !== '000001'))) {
+      currentProgress = firstPageId;
+      isFreshStart = true;
+    }
     const hasProgress = !nodeId && Boolean(currentProgress && String(currentProgress).trim() !== "");
     const crumbs = buildTreeBreadcrumbs(nodeId);
     const breadcrumbHtml = nodeId ? `
@@ -4723,8 +4733,8 @@
       <div class="treeBrowserContainer">
         ${hasProgress ? `
           <div class="treeResumeBar">
-            <span class="treeNodeLabel">Continue where you left off</span>
-            <a href="/page/${encodeURIComponent(String(currentProgress))}" id="resume-reading-btn" class="primaryActionBtn" style="text-decoration: none;">Resume Page ${escapeHtml(String(currentProgress))}</a>
+            <span class="treeNodeLabel">${isFreshStart ? 'Ready to start reading' : 'Continue where you left off'}</span>
+            <a href="/page/${encodeURIComponent(String(currentProgress))}" id="resume-reading-btn" class="primaryActionBtn" style="text-decoration: none;">${isFreshStart ? `Start Page ${escapeHtml(String(currentProgress))}` : `Resume Page ${escapeHtml(String(currentProgress))}`}</a>
           </div>
         ` : ""}
         <div class="card treeBrowserCard">
@@ -5402,6 +5412,14 @@
       return;
     }
 
+    if (route.mode !== 'PAGE' && route.mode !== 'FANCOMIC') {
+      const activeTabObj = getActiveTab();
+      if (activeTabObj && document.title && activeTabObj.title !== document.title) {
+        activeTabObj.title = document.title;
+        renderTabBar();
+      }
+    }
+
     if (window.RRWRAnimations) {
       const scrollTok = perf ? perf.beginPhase('restoreScrollState', { route: routeUrl }) : null;
       window.RRWRAnimations.restoreScrollState(getActiveTab(), {
@@ -5457,6 +5475,246 @@
     document.addEventListener('touchstart', () => {
       tooltip.classList.add('hidden');
     }, { passive: true });
+  }
+
+  const mediaViewerState = {
+    scale: 1,
+    tx: 0,
+    ty: 0,
+    fitMode: 'fit',
+    pixelated: false,
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    origTx: 0,
+    origTy: 0
+  };
+
+  function togglePageFullscreen(forceState) {
+    const active = typeof forceState === 'boolean'
+      ? forceState
+      : !document.body.classList.contains('rrwr-page-fullscreen');
+    document.body.classList.toggle('rrwr-page-fullscreen', active);
+    const navBtn = document.getElementById('nav-fullscreen-btn');
+    if (navBtn) navBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    const exitBtn = document.getElementById('page-fullscreen-exit-btn');
+    if (exitBtn) exitBtn.classList.toggle('hidden', !active);
+  }
+
+  function applyMediaViewerTransform() {
+    const img = document.getElementById('media-viewer-img');
+    const label = document.getElementById('mv-zoom-label');
+    if (!img) return;
+    img.classList.remove('fit-actual', 'fit-width');
+    if (mediaViewerState.fitMode === 'actual') img.classList.add('fit-actual');
+    else if (mediaViewerState.fitMode === 'width') img.classList.add('fit-width');
+    img.classList.toggle('pixelated', mediaViewerState.pixelated);
+    img.style.transform = `translate3d(${mediaViewerState.tx}px, ${mediaViewerState.ty}px, 0) scale(${mediaViewerState.scale})`;
+    if (label) label.textContent = `${Math.round(mediaViewerState.scale * 100)}%`;
+
+    const fitBtns = document.querySelectorAll('#media-viewer-overlay [data-fit]');
+    for (const btn of fitBtns) {
+      btn.classList.toggle('active', btn.dataset.fit === mediaViewerState.fitMode);
+    }
+    const renderBtn = document.getElementById('mv-render-mode-btn');
+    if (renderBtn) {
+      renderBtn.setAttribute('aria-pressed', mediaViewerState.pixelated ? 'true' : 'false');
+      renderBtn.textContent = mediaViewerState.pixelated ? 'Crisp: On' : 'Crisp: Off';
+    }
+  }
+
+  function resetMediaViewer() {
+    mediaViewerState.scale = 1;
+    mediaViewerState.tx = 0;
+    mediaViewerState.ty = 0;
+    mediaViewerState.fitMode = 'fit';
+    applyMediaViewerTransform();
+  }
+
+  function openMediaViewer(src, alt) {
+    const overlay = document.getElementById('media-viewer-overlay');
+    const img = document.getElementById('media-viewer-img');
+    if (!overlay || !img || !src) return;
+    img.src = src;
+    img.alt = alt || '';
+    mediaViewerState.pixelated = false;
+    resetMediaViewer();
+    overlay.classList.remove('hidden');
+  }
+
+  function closeMediaViewer() {
+    const overlay = document.getElementById('media-viewer-overlay');
+    if (!overlay) return;
+    overlay.classList.add('hidden');
+  }
+
+  function enhanceMediaContainers(container) {
+    if (!container) return;
+    const imgs = Array.from(container.querySelectorAll('img.panel-media, img'));
+    for (const img of imgs) {
+      if (img.closest('.mediaFrameWrapper')) continue;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'mediaFrameWrapper';
+      img.parentNode.insertBefore(wrapper, img);
+      wrapper.appendChild(img);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mediaExpandBtn';
+      btn.textContent = 'Expand';
+      btn.title = 'Open Fullscreen Media Viewer';
+      btn.setAttribute('aria-label', 'Open Fullscreen Media Viewer');
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openMediaViewer(img.currentSrc || img.src, img.alt);
+      });
+      wrapper.appendChild(btn);
+
+      img.addEventListener('dblclick', (ev) => {
+        ev.preventDefault();
+        openMediaViewer(img.currentSrc || img.src, img.alt);
+      });
+    }
+
+    const swfBoxes = Array.from(container.querySelectorAll('.swf-embed-container'));
+    for (const box of swfBoxes) {
+      if (box.querySelector('.mediaExpandBtn')) continue;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'mediaExpandBtn';
+      btn.textContent = 'Fullscreen';
+      btn.title = 'Toggle Flash Fullscreen (Esc to exit)';
+      btn.setAttribute('aria-label', 'Toggle Flash Fullscreen');
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const expanded = box.classList.toggle('rrwr-media-expanded');
+        btn.textContent = expanded ? 'Exit Fullscreen' : 'Fullscreen';
+      });
+      box.appendChild(btn);
+    }
+  }
+
+  function setupFullscreenAndMediaViewer() {
+    const navFsBtn = document.getElementById('nav-fullscreen-btn');
+    if (navFsBtn) {
+      navFsBtn.addEventListener('click', () => togglePageFullscreen());
+    }
+    const exitFsBtn = document.getElementById('page-fullscreen-exit-btn');
+    if (exitFsBtn) {
+      exitFsBtn.addEventListener('click', () => togglePageFullscreen(false));
+    }
+
+    const overlay = document.getElementById('media-viewer-overlay');
+    const stage = document.getElementById('media-viewer-stage');
+    const img = document.getElementById('media-viewer-img');
+    if (!overlay || !stage || !img) return;
+
+    const zoomIn = document.getElementById('mv-zoom-in-btn');
+    const zoomOut = document.getElementById('mv-zoom-out-btn');
+    const resetBtn = document.getElementById('mv-reset-btn');
+    const closeBtn = document.getElementById('mv-close-btn');
+    const renderBtn = document.getElementById('mv-render-mode-btn');
+
+    if (zoomIn) {
+      zoomIn.addEventListener('click', () => {
+        mediaViewerState.scale = Math.min(8, Number((mediaViewerState.scale * 1.25).toFixed(3)));
+        applyMediaViewerTransform();
+      });
+    }
+    if (zoomOut) {
+      zoomOut.addEventListener('click', () => {
+        mediaViewerState.scale = Math.max(0.25, Number((mediaViewerState.scale / 1.25).toFixed(3)));
+        applyMediaViewerTransform();
+      });
+    }
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => resetMediaViewer());
+    }
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => closeMediaViewer());
+    }
+    if (renderBtn) {
+      renderBtn.addEventListener('click', () => {
+        mediaViewerState.pixelated = !mediaViewerState.pixelated;
+        applyMediaViewerTransform();
+      });
+    }
+
+    const fitBtns = overlay.querySelectorAll('[data-fit]');
+    for (const btn of fitBtns) {
+      btn.addEventListener('click', () => {
+        mediaViewerState.fitMode = btn.dataset.fit || 'fit';
+        mediaViewerState.scale = 1;
+        mediaViewerState.tx = 0;
+        mediaViewerState.ty = 0;
+        applyMediaViewerTransform();
+      });
+    }
+
+    stage.addEventListener('wheel', (ev) => {
+      ev.preventDefault();
+      const factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
+      mediaViewerState.scale = Math.min(8, Math.max(0.25, Number((mediaViewerState.scale * factor).toFixed(3))));
+      applyMediaViewerTransform();
+    }, { passive: false });
+
+    stage.addEventListener('pointerdown', (ev) => {
+      if (ev.button !== 0) return;
+      mediaViewerState.dragging = true;
+      mediaViewerState.startX = ev.clientX;
+      mediaViewerState.startY = ev.clientY;
+      mediaViewerState.origTx = mediaViewerState.tx;
+      mediaViewerState.origTy = mediaViewerState.ty;
+      stage.classList.add('is-dragging');
+      img.classList.add('is-dragging');
+      if (typeof stage.setPointerCapture === 'function') {
+        try { stage.setPointerCapture(ev.pointerId); } catch (_) {}
+      }
+    });
+
+    stage.addEventListener('pointermove', (ev) => {
+      if (!mediaViewerState.dragging) return;
+      mediaViewerState.tx = mediaViewerState.origTx + (ev.clientX - mediaViewerState.startX);
+      mediaViewerState.ty = mediaViewerState.origTy + (ev.clientY - mediaViewerState.startY);
+      applyMediaViewerTransform();
+    });
+
+    const endDrag = () => {
+      if (!mediaViewerState.dragging) return;
+      mediaViewerState.dragging = false;
+      stage.classList.remove('is-dragging');
+      img.classList.remove('is-dragging');
+    };
+    stage.addEventListener('pointerup', endDrag);
+    stage.addEventListener('pointercancel', endDrag);
+
+    stage.addEventListener('dblclick', (ev) => {
+      if (ev.target === stage || ev.target === img) {
+        closeMediaViewer();
+      }
+    });
+
+    document.addEventListener('keydown', (ev) => {
+      if (overlay.classList.contains('hidden')) return;
+      if (ev.key === '+' || ev.key === '=') {
+        ev.preventDefault();
+        mediaViewerState.scale = Math.min(8, Number((mediaViewerState.scale * 1.25).toFixed(3)));
+        applyMediaViewerTransform();
+      } else if (ev.key === '-' || ev.key === '_') {
+        ev.preventDefault();
+        mediaViewerState.scale = Math.max(0.25, Number((mediaViewerState.scale / 1.25).toFixed(3)));
+        applyMediaViewerTransform();
+      } else if (ev.key === '0') {
+        ev.preventDefault();
+        resetMediaViewer();
+      } else if (ev.key.toLowerCase() === 'p') {
+        ev.preventDefault();
+        mediaViewerState.pixelated = !mediaViewerState.pixelated;
+        applyMediaViewerTransform();
+      }
+    });
   }
 
   function setupKeyboardShortcuts() {
@@ -5566,6 +5824,43 @@
         e.preventDefault();
         historyForward();
         return;
+      }
+
+      if (e.key === 'F11') {
+        e.preventDefault();
+        togglePageFullscreen();
+        return;
+      }
+
+      if (!isInput && !hasPrimaryModifier && !e.altKey && e.key.toLowerCase() === 'f') {
+        const mv = document.getElementById('media-viewer-overlay');
+        if (!mv || mv.classList.contains('hidden')) {
+          e.preventDefault();
+          togglePageFullscreen();
+          return;
+        }
+      }
+
+      if (e.key === 'Escape') {
+        const mv = document.getElementById('media-viewer-overlay');
+        if (mv && !mv.classList.contains('hidden')) {
+          e.preventDefault();
+          closeMediaViewer();
+          return;
+        }
+        const expandedSwf = document.querySelector('.swf-embed-container.rrwr-media-expanded');
+        if (expandedSwf) {
+          e.preventDefault();
+          expandedSwf.classList.remove('rrwr-media-expanded');
+          const btn = expandedSwf.querySelector('.mediaExpandBtn');
+          if (btn) btn.textContent = 'Fullscreen';
+          return;
+        }
+        if (document.body.classList.contains('rrwr-page-fullscreen')) {
+          e.preventDefault();
+          togglePageFullscreen(false);
+          return;
+        }
       }
 
       if (e.altKey) {
@@ -5915,6 +6210,7 @@
       setupSoundTestBar();
       setupTooltips();
       setupKeyboardShortcuts();
+      setupFullscreenAndMediaViewer();
       bindChromeEvents();
       bindFlashSaveEvents();
       if (animEngine) {

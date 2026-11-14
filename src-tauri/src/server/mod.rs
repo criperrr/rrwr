@@ -336,6 +336,12 @@ pub async fn dispatch_ipc(
                 "linux"
             };
             let asset_dir = state.asset_dir();
+            let first_page_id = state
+                .store
+                .get_story_range(0, 1)
+                .await
+                .first()
+                .map(|p| p.page_id.clone());
             let info = serde_json::json!({
                 "version": env!("CARGO_PKG_VERSION"),
                 "platform": platform,
@@ -345,6 +351,7 @@ pub async fn dispatch_ipc(
                 "asset_port": state.asset_port,
                 "overlay_generation": state.vfs.generation(),
                 "overlayGeneration": state.vfs.generation(),
+                "first_page_id": first_page_id,
             });
             json_response(StatusCode::OK, info)
         }
