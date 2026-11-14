@@ -12,8 +12,25 @@ A native, lightweight, offline-first desktop and mobile webcomic reader built wi
 
 ---
 
+## Quick Install (Linux)
+
+Install RRWR automatically on any Linux distribution (Arch, Ubuntu, Debian, Fedora, openSUSE, Void, Alpine) and graphical environment (GNOME, KDE Plasma, Hyprland, Sway, X11, Wayland) with a single command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/criperrr/rrwr/main/scripts/install.sh | bash
+```
+
+The installer transparently alerts you before every step, installs required runtime libraries (WebKitGTK 4.1, GTK3, GStreamer PipeWire/PulseAudio plugins, Mesa/EGL, and DejaVu fonts), verifies library linkage, and registers your desktop launcher and shortcuts. To compile natively from source instead of using the prebuilt release binary:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/criperrr/rrwr/main/scripts/install.sh | bash -s -- --from-source
+```
+
+---
+
 ## Table of Contents
 
+- [Quick Install (Linux)](#quick-install-linux)
 - [Quick Start](#quick-start)
   - [Step 1: Prepare an Asset Pack](#step-1-prepare-an-asset-pack)
   - [Step 2: Installation (Linux)](#step-2-installation-linux)
@@ -43,16 +60,18 @@ RRWR does not bundle story media inside the executable. It mounts a user-supplie
 
 ### Step 2: Installation (Linux)
 
-#### Arch Linux (One-Liner)
+#### Universal One-Liner (All Linux Distributions)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/criperrr/rrwr/main/scripts/install-arch.sh | bash
+curl -fsSL https://raw.githubusercontent.com/criperrr/rrwr/main/scripts/install.sh | bash
 ```
 
-This installs the required Arch packages (`webkit2gtk-4.1`, `gtk3`, `libayatana-appindicator`, `librsvg`, `fuse2`), downloads the latest `.AppImage` release (or builds from source automatically if no release asset is published yet), and registers the desktop entry in `~/.local/share/applications/rrwr.desktop`. To force building from source locally, pass `--from-source`:
+This autonomous installer detects your Linux distribution and package manager (`pacman`, `apt`, `dnf`, `yum`, `zypper`, `apk`, `xbps-install`), installs the required WebKitGTK/GTK3/GStreamer runtime libraries, downloads and verifies the prebuilt binary (or falls back to AppImage extraction / native Rust compilation if needed), and registers the desktop launcher and shortcut for GNOME, KDE Plasma, XFCE, Sway, Hyprland, or any XDG-compliant desktop environment.
+
+To force compiling natively from source on any distro, pass `--from-source`:
 
 ```bash
-bash scripts/install-arch.sh --from-source
+curl -fsSL https://raw.githubusercontent.com/criperrr/rrwr/main/scripts/install.sh | bash -s -- --from-source
 ```
 
 #### Ubuntu / Debian / Linux Mint / Pop!_OS (`.deb`)
