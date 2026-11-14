@@ -123,6 +123,18 @@ impl Vfs {
                     return Some(target.clone());
                 }
             }
+            if let Some(stem) = clean.strip_suffix(".swf") {
+                if !stem.ends_with("_hq") && !stem.ends_with("_hqbaked") {
+                    for suffix in ["_hqbaked.swf", "_hq.swf"] {
+                        let hq_key = format!("{stem}{suffix}");
+                        if let Some(target) = map.get(&hq_key) {
+                            if target.is_file() {
+                                return Some(target.clone());
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         let base_dir = self.base_dir.read().unwrap().clone();
