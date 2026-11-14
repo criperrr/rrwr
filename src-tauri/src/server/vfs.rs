@@ -195,13 +195,25 @@ impl Vfs {
         }
 
         // 5. Built-in fallback routes
-        // Fallback for Ruffle WASM/JS: js/ruffle/<file> -> archive/imods/_ruffle_bundle/js/ruffle/<file>
+        // Fallback for Ruffle WASM/JS: js/ruffle/<file> -> archive/imods/<bundle>/js/ruffle/<file>
         if let Some(rel) = clean.strip_prefix("js/ruffle/") {
             let imod = base_dir
                 .join("archive/imods/_ruffle_bundle/js/ruffle")
                 .join(rel);
             if imod.is_file() {
                 return Some(imod);
+            }
+            let imods_dir = base_dir.join("archive/imods");
+            if let Ok(entries) = std::fs::read_dir(&imods_dir) {
+                for entry in entries.flatten() {
+                    let sub_path = entry.path();
+                    if sub_path.is_dir() {
+                        let candidate = sub_path.join("js/ruffle").join(rel);
+                        if candidate.is_file() {
+                            return Some(candidate);
+                        }
+                    }
+                }
             }
         }
 

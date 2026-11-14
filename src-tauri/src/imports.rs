@@ -1,18 +1,64 @@
 use std::fs::{self, File};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
 const MAX_ARCHIVE_ENTRIES: usize = 100_000;
 const MAX_ARCHIVE_UNPACKED_BYTES: u64 = 16 * 1024 * 1024 * 1024;
 
+/// Resolves the `(story_json, music_json)` data files inside an asset pack root.
+/// Prefers `story.json`, and falls back to any JSON object in the data directory
+/// containing a top-level `"story"` key.
+pub fn find_archive_data_files(path: &Path) -> Option<(PathBuf, PathBuf)> {
+    let candidates = ["archive/data", "archive/Data", "Archive/data"];
+    for rel in candidates {
+        let data_dir = path.join(rel);
+        if !data_dir.is_dir() {
+            continue;
+        }
+        let music_path = data_dir.join("music.json");
+        if !music_path.is_file() {
+            continue;
+        }
+        let primary_story = data_dir.join("story.json");
+        if primary_story.is_file() {
+            return Some((primary_story, music_path));
+        }
+        if let Ok(entries) = fs::read_dir(&data_dir) {
+            for entry in entries.flatten() {
+                let entry_path = entry.path();
+                if !entry_path.is_file() {
+                    continue;
+                }
+                let is_json = entry_path
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("json"));
+                let is_music = entry_path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.eq_ignore_ascii_case("music.json"));
+                if !is_json || is_music {
+                    continue;
+                }
+                if let Ok(mut file) = File::open(&entry_path) {
+                    let mut buf = [0u8; 512];
+                    if let Ok(n) = file.read(&mut buf) {
+                        if let Ok(head) = std::str::from_utf8(&buf[..n]) {
+                            let trimmed = head.trim_start();
+                            if trimmed.starts_with('{') && trimmed.contains("\"story\"") {
+                                return Some((entry_path, music_path));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 pub fn is_asset_pack(path: &Path) -> bool {
-    let has_story = path.join("archive/data/story.json").is_file()
-        || path.join("archive/Data/story.json").is_file()
-        || path.join("Archive/data/story.json").is_file();
-    let has_music = path.join("archive/data/music.json").is_file()
-        || path.join("archive/Data/music.json").is_file()
-        || path.join("Archive/data/music.json").is_file();
-    has_story && has_music
+    find_archive_data_files(path).is_some()
 }
 
 pub fn custom_asset_dir() -> PathBuf {

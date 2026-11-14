@@ -10,8 +10,15 @@ use crate::rpc::DiscordStatus;
 use crate::AppState;
 
 #[tauri::command]
-pub fn get_app_info(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
+pub async fn get_app_info(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
     let asset_dir = state.0.asset_dir().to_string_lossy().into_owned();
+    let first_page_id = state
+        .0
+        .store
+        .get_story_range(0, 1)
+        .await
+        .first()
+        .map(|p| p.page_id.clone());
     let platform = if cfg!(target_os = "android") {
         "android"
     } else if cfg!(target_os = "windows") {
@@ -30,6 +37,7 @@ pub fn get_app_info(state: tauri::State<'_, AppState>) -> Result<serde_json::Val
         "asset_port": state.0.asset_port,
         "overlay_generation": state.0.vfs.generation(),
         "overlayGeneration": state.0.vfs.generation(),
+        "first_page_id": first_page_id,
     }))
 }
 
