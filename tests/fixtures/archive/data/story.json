@@ -1,0 +1,168 @@
+{
+  "story": {
+    "000001": {
+      "title": "Sample WebComic",
+      "pageId": "000001",
+      "timestamp": "1700000000",
+      "flag": [],
+      "media": [
+        "/storyfiles/comic1/00001.gif"
+      ],
+      "content": "A young explorer stands in a quiet room. Today is a special day, and a new adventure is about to begin!<br /><br />What will the name of this young explorer be?",
+      "next": [
+        "000002"
+      ]
+    },
+    "000002": {
+      "title": "Choose a name.",
+      "pageId": "000002",
+      "timestamp": "1700000030",
+      "flag": [],
+      "media": [
+        "/storyfiles/comic1/00002.gif"
+      ],
+      "content": "",
+      "next": [
+        "000003"
+      ],
+      "previous": "000001"
+    },
+    "000003": {
+      "title": "Look around.",
+      "pageId": "000003",
+      "timestamp": "1700000060",
+      "flag": [],
+      "media": [
+        "/storyfiles/comic1/00003.gif"
+      ],
+      "content": "",
+      "next": [
+        "000004"
+      ],
+      "previous": "000002"
+    },
+    "000004": {
+      "title": "Inspect the desk.",
+      "pageId": "000004",
+      "timestamp": "1700000090",
+      "flag": [],
+      "media": [
+        "/storyfiles/comic1/00004.gif"
+      ],
+      "content": "Your name is ALEX. Today is your special day. A stack of NOTEBOOKS and a desk lamp sit nearby. You have a variety of INTERESTS. You enjoy CLASSIC FILMS, programming computers, and tinkering with gadgets. You also like to play GAMES sometimes.<br /><br />What will you do?",
+      "next": [
+        "000005"
+      ],
+      "previous": "000003"
+    },
+    "000005": {
+      "title": "Alex: Quickly retrieve items from drawer.",
+      "pageId": "000005",
+      "timestamp": "1700000120",
+      "flag": [],
+      "media": [
+        "/storyfiles/comic1/00005.gif"
+      ],
+      "content": "Your ITEMS are in your STORAGE CHEST!",
+      "next": [
+        "000006"
+      ],
+      "previous": "000004"
+    },
+    "000006": {
+      "title": "Alex: Go out to balcony.",
+      "pageId": "000006",
+      "timestamp": "1700000150",
+      "flag": [],
+      "media": [
+        "/storyfiles/comic1/00160.gif"
+      ],
+      "content": "|CHATLOG|<br /><span style=\"color: #1a5fb4\">AL: hey, i'm out on the balcony now.</span><br /><span style=\"color: #1a5fb4\">AL: i am messaging from my handheld device.</span><br /><span style=\"color: #613583\">SM: The one you left in the yard?</span><br /><span style=\"color: #1a5fb4\">AL: no, i am telling you.</span><br /><span style=\"color: #1a5fb4\">AL: it fell out of my inventory bag.</span>",
+      "next": [
+        "000007"
+      ],
+      "previous": "000005"
+    },
+    "000007": {
+      "title": "[S] Chapter 1: Rise up.",
+      "pageId": "000007",
+      "timestamp": "1700000180",
+      "flag": [
+        "F",
+        "HQ"
+      ],
+      "media": [
+        "/storyfiles/comic1/scene1/scene1.swf"
+      ],
+      "content": "",
+      "next": [
+        "000008"
+      ],
+      "previous": "000006"
+    },
+    "000008": {
+      "title": "[S] Finale.",
+      "pageId": "000008",
+      "timestamp": "1700000210",
+      "flag": [
+        "S",
+        "HQ"
+      ],
+      "media": [
+        "/storyfiles/comic1/scene2/scene2.swf"
+      ],
+      "content": "",
+      "next": [
+        "000009"
+      ],
+      "previous": "000007",
+      "theme": "finale"
+    },
+    "secretpanel": {
+      "title": "[S] Secret: Reveal plan.",
+      "pageId": "secretpanel",
+      "timestamp": "",
+      "flag": [
+        "F",
+        "HQ"
+      ],
+      "media": [
+        "/storyfiles/comic1/secretpanel/secretpanel.swf"
+      ],
+      "content": "",
+      "next": []
+    }
+  },
+  "sidestory": {
+    "000001": {
+      "title": "Side Story",
+      "pageId": "000001",
+      "timestamp": "",
+      "flag": [],
+      "media": [
+        "/sidestory/01.gif"
+      ],
+      "content": "A short bonus adventure begins here.",
+      "next": [
+        "000002"
+      ]
+    },
+    "000002": {
+      "title": "Continue.",
+      "pageId": "000002",
+      "timestamp": "",
+      "flag": [],
+      "media": [
+        "/sidestory/02.gif"
+      ],
+      "content": "You take a look around the neighborhood.",
+      "next": [],
+      "previous": "000001"
+    }
+  },
+  "classic_extras": {},
+  "bonus_pages": {},
+  "faqs": {},
+  "extra_list": [],
+  "extraComicFlag": ""
+}

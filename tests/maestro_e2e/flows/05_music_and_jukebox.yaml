@@ -1,0 +1,26 @@
+appId: com.rrwr.app
+---
+- launchApp
+- tapOn:
+    text: "RETRO READER"
+    optional: true
+- assertVisible:
+    text: ".*Sample WebComic.*"
+- tapOn:
+    text: "MUSIC"
+- assertVisible:
+    text: ".*DISCOGRAPHY.*"
+- takeScreenshot: "03_route_music"
+- takeScreenshot: "05_music_01_discography_top"
+- swipe:
+    start: "50%,70%"
+    end: "50%,30%"
+- takeScreenshot: "05_music_02_discography_grid"
+- tapOn:
+    text: "TRACKS"
+    optional: true
+- takeScreenshot: "05_music_03_tracks_list"
+- swipe:
+    start: "50%,70%"
+    end: "50%,30%"
+- takeScreenshot: "05_music_04_tracks_scrolled"

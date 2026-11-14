@@ -1,0 +1,18 @@
+pkgname=rrwr-bin
+pkgver=2.8.2
+pkgrel=1
+pkgdesc='RRWR - Rust-Ruffle WebComic Reader desktop app (prebuilt Linux binary)'
+arch=('x86_64')
+url='https://github.com/criperrr/RRWR-rust'
+license=('custom')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator')
+provides=('rrwr')
+conflicts=('rrwr' 'rrwr-git' 'rrwr-dev-git')
+source=("rrwr-${pkgver}-linux-x86_64.tar.gz::${url}/releases/download/v${pkgver}/rrwr-${pkgver}-linux-x86_64.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  install -Dm755 "$srcdir/rrwr-linux-x86_64/usr/bin/rrwr" "$pkgdir/usr/bin/rrwr"
+  install -Dm644 "$srcdir/rrwr-linux-x86_64/usr/share/applications/rrwr.desktop" "$pkgdir/usr/share/applications/rrwr.desktop"
+  install -Dm644 "$srcdir/rrwr-linux-x86_64/usr/share/icons/hicolor/256x256/apps/rrwr.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/rrwr.png"
+}

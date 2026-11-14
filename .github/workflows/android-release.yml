@@ -1,0 +1,163 @@
+name: Build and Release Android APK (Tauri 2.0)
+
+"on":
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - "src/**"
+      - "src-tauri/tauri.conf.json"
+      - "src-tauri/gen/android/**"
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag (e.g. v2.8.2 or empty for rolling/latest release)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build_android:
+    name: Build & Package Android APK
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Android NDK
+        run: |
+          ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+
+          # Detect installed NDK 26.x or 27.x or install via sdkmanager
+          NDK_PATH=$(ls -d ${ANDROID_HOME}/ndk/27.* ${ANDROID_HOME}/ndk/26.* 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$NDK_PATH" ] || [ ! -d "$NDK_PATH" ]; then
+            echo "Installing Android NDK 27.1.12297006 via sdkmanager..."
+            yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses || true
+            ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "ndk;27.1.12297006"
+            NDK_PATH="${ANDROID_HOME}/ndk/27.1.12297006"
+          fi
+
+          echo "Using Android NDK: $NDK_PATH"
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+          echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android, x86_64-linux-android, armv7-linux-androideabi, i686-linux-android
+
+      - name: Cache Cargo Dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Android APK via Tauri CLI
+        run: |
+          npx tauri android build --apk --ci
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          NDK_HOME: ${{ env.NDK_HOME }}
+
+      - name: Collect and Hash APK Artifacts
+        id: collect_artifacts
+        run: |
+          mkdir -p android_assets
+
+          VERSION="$(node -p "require('./package.json').version" 2>/dev/null || sed -n 's/^version = "\([^"]*\)"/\1/p' src-tauri/Cargo.toml | head -n1)"
+          echo "Application Version: $VERSION"
+
+          APK_COUNT=0
+          while IFS= read -r apk; do
+            if [ -f "$apk" ]; then
+              base_name=$(basename "$apk")
+              clean_name=$(echo "$base_name" | sed "s/^app-/rrwr-${VERSION}-/")
+              target="android_assets/${clean_name}"
+              cp "$apk" "$target"
+              (cd android_assets && sha256sum "$clean_name" > "${clean_name}.sha256")
+              echo "Processed artifact: $target"
+              APK_COUNT=$((APK_COUNT + 1))
+            fi
+          done < <(find src-tauri/gen/android/app/build/outputs/apk/ -type f -name "*.apk")
+
+          if [ "$APK_COUNT" -eq 0 ]; then
+            echo "ERROR: No APK files found in src-tauri/gen/android/app/build/outputs/apk/"
+            exit 1
+          fi
+
+          echo "Successfully collected $APK_COUNT APK artifact(s):"
+          ls -la android_assets/
+
+      - name: Determine Release Metadata
+        id: release_meta
+        run: |
+          if [ -n "${{ inputs.release_tag }}" ]; then
+            TAG="${{ inputs.release_tag }}"
+            TITLE="Release $TAG"
+          elif [[ "${{ github.ref }}" =~ ^refs/tags/v ]]; then
+            TAG="${{ github.ref_name }}"
+            TITLE="Release $TAG"
+          else
+            LATEST_TAG=$(gh release view --json tagName -q .tagName 2>/dev/null || git describe --tags --abbrev=0 2>/dev/null || echo "latest")
+            TAG="${LATEST_TAG:-latest}"
+            if [ "$TAG" = "latest" ]; then
+              TITLE="RRWR Rolling Release (latest)"
+            else
+              TITLE="Release $TAG"
+            fi
+          fi
+          echo "Selected release tag: $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Android APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          name: ${{ steps.release_meta.outputs.title }}
+          files: |
+            android_assets/*.apk
+            android_assets/*.sha256
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

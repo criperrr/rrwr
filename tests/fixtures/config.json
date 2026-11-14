@@ -1,0 +1,101 @@
+{
+  "__internal__": {
+    "migrations": {
+      "version": "2.8.1"
+    }
+  },
+  "lastMigratedVersion": "2.6.9",
+  "timestamp": 1793906928628,
+  "assetDir": "/tmp/rrwr-assets",
+  "tabData": {
+    "activeTabKey": "tab_beta",
+    "tabs": {
+      "tab_alpha": {
+        "key": "tab_alpha",
+        "url": "/story/1",
+        "title": "Sample WebComic",
+        "hasEmbed": false,
+        "history": [
+          "/"
+        ],
+        "future": []
+      },
+      "tab_beta": {
+        "key": "tab_beta",
+        "url": "/story/6",
+        "title": "Alex: Go out to balcony.",
+        "hasEmbed": false,
+        "history": [
+          "/",
+          "/story/1"
+        ],
+        "future": []
+      }
+    },
+    "tabList": [
+      "tab_alpha",
+      "tab_beta"
+    ],
+    "sortedTabList": [],
+    "closedTabList": []
+  },
+  "saveData": {
+    "saves": {},
+    "saveList": []
+  },
+  "settings": {
+    "readingProgress": {
+      "current": "000008",
+      "limit": "000006"
+    },
+    "notifications": true,
+    "subNotifications": false,
+    "showAddressBar": true,
+    "urlTooltip": true,
+    "switchToNewTabs": false,
+    "forceScrollBar": true,
+    "hideFullscreenHeader": false,
+    "smoothScrolling": false,
+    "pixelScaling": true,
+    "storyMode": false,
+    "bandcampEmbed": false,
+    "allowSysUpdateNotifs": false,
+    "lastCheckedUpdate": "2026-11-05T19:14:28.855Z",
+    "devMode": false,
+    "enableHardwareAcceleration": true,
+    "useSystemWindowDecorations": false,
+    "useTabbedBrowsing": true,
+    "themeOverride": "default",
+    "themeOverrideUI": "default",
+    "forceThemeOverride": false,
+    "forceThemeOverrideUI": false,
+    "textOverride": {
+      "fontFamily": "",
+      "bold": false,
+      "fontSize": 1.0,
+      "lineHeight": 1.0,
+      "paragraphSpacing": false,
+      "highContrast": false
+    },
+    "arrowNav": true,
+    "openLogs": false,
+    "hqAudio": true,
+    "jsFlashes": true,
+    "reducedMotion": false,
+    "credits": true,
+    "fastForward": false,
+    "variant1": false,
+    "variant2": false,
+    "variant3": false,
+    "variant4": false,
+    "variant5": false,
+    "variant6": false,
+    "altAudio": false,
+    "altTrackSet": false,
+    "altVariant": false,
+    "extraComicFlag": false,
+    "ruffleFallback": false,
+    "modListEnabled": []
+  },
+  "appVersion": "2.8.1"
+}

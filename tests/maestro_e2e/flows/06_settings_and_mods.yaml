@@ -1,0 +1,22 @@
+appId: com.rrwr.app
+---
+- launchApp
+- tapOn:
+    text: "RETRO READER"
+    optional: true
+- assertVisible:
+    text: ".*Sample WebComic.*"
+- tapOn:
+    text: "SETTINGS"
+- assertVisible:
+    text: ".*SETTINGS & PREFERENCES.*"
+- takeScreenshot: "04_route_settings"
+- takeScreenshot: "06_settings_01_general"
+- swipe:
+    start: "50%,70%"
+    end: "50%,30%"
+- takeScreenshot: "06_settings_02_theme_controls"
+- swipe:
+    start: "50%,70%"
+    end: "50%,30%"
+- takeScreenshot: "06_settings_03_mods_section"

@@ -1,0 +1,31 @@
+pkgname=rrwr-dev-git
+pkgver=2.8.2.r0.g0000000
+pkgrel=1
+pkgdesc='RRWR - Rust-Ruffle WebComic Reader desktop app (builds dev branch)'
+arch=('x86_64')
+url='https://github.com/criperrr/RRWR-rust'
+license=('custom')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator')
+makedepends=('git' 'rust' 'cargo' 'pkgconf' 'openssl')
+provides=('rrwr')
+conflicts=('rrwr' 'rrwr-bin' 'rrwr-git')
+source=("rrwr::git+${url}.git#branch=dev")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$srcdir/rrwr"
+  basever=$(sed -n 's/^version = \"\([^\"]*\)\"/\1/p' src-tauri/Cargo.toml | head -n1)
+  printf '%s.r%s.g%s' "$basever" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cd "$srcdir/rrwr"
+  cargo build --release --locked
+}
+
+package() {
+  cd "$srcdir/rrwr"
+  install -Dm755 target/release/rrwr "$pkgdir/usr/bin/rrwr"
+  install -Dm644 packaging/linux/rrwr.desktop "$pkgdir/usr/share/applications/rrwr.desktop"
+  install -Dm644 src-tauri/icons/icon.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/rrwr.png"
+}

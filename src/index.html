@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>RRWR - Rust-Ruffle WebComic Reader</title>
+  <link rel="preload" href="/fonts/courier-prime/Courier-Prime.woff" as="font" type="font/woff" crossorigin>
+  <link rel="stylesheet" href="/styles/main.css">
+</head>
+<body>
+  <div id="app" data-theme="default" data-anim-fps="native" data-animations-enabled="true">
+    <!-- Initial RRWR Boot Splash (removed cleanly once initApp completes) -->
+    <div id="boot-splash" class="bootSplash" role="status" aria-live="polite" aria-label="Loading RRWR">
+      <div class="bootSplashBackdrop"></div>
+      <div class="bootSplashCard">
+        <div class="bootSplashTopRule">
+          <span class="bootSplashTag">RRWR // ARCHIVE SHELL</span>
+          <span class="bootSplashTag">LOADING</span>
+        </div>
+        <div class="bootSplashHero">
+          <div class="bootSplashEmblemWrap" aria-hidden="true">
+            <svg class="bootSplashEmblemSvg" viewBox="0 0 64 64" width="60" height="60">
+              <rect x="14" y="10" width="40" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="2" opacity="0.45" />
+              <rect x="10" y="14" width="40" height="40" rx="6" fill="none" stroke="currentColor" stroke-width="2.5" />
+              <polygon points="24,25 41,34 24,43" fill="currentColor" />
+            </svg>
+          </div>
+          <div class="bootSplashTitleGroup">
+            <div class="bootSplashHeadline">RRWR</div>
+            <div class="bootSplashTag">RUST-RUFFLE WEBCOMIC READER</div>
+          </div>
+        </div>
+        <div class="bootSplashProgressTrack">
+          <div id="boot-splash-bar-fill" class="bootSplashProgressFill" style="width: 14%;"></div>
+        </div>
+        <div id="boot-splash-status" class="bootSplashStatus">&gt; BOOTING ARCHIVE READER...</div>
+      </div>
+    </div>
+
+    <!-- Top Browser Chrome: TabBar (Row 1) & AddressBar (Row 2) -->
+    <header id="appHeader" class="appHeader">
+      <!-- Line 1: Tab Bar (#tab-bar / .tabSection) -->
+      <div id="tab-bar" class="tabSection">
+        <ul id="tabs" class="tabList" role="tablist">
+          <li class="tabShell activeTabShell" data-tab-key="000">
+            <div class="tab activeTab" data-tab-key="000" role="tab" aria-selected="true">
+              <div class="tabTitle"><span>RRWR</span></div>
+              <div class="systemButton closeTabButton" title="Close Tab (Ctrl+W)">✕</div>
+            </div>
+          </li>
+        </ul>
+        <button id="new-tab-btn" class="systemButton newTabButton" title="New tab"><span>＋</span></button>
+        <div class="sysActionButtons">
+          <button id="bookmarks-toggle-btn" class="systemButton sysActionButton bookmarksButton" title="Save cartridges">
+            <svg viewBox="0 0 384 512" width="14" height="14"><path fill="currentColor" d="M0 48C0 21.5 21.5 0 48 0l288 0c26.5 0 48 21.5 48 48l0 440c0 9-5 17.2-13 21.3s-17.6 3.4-24.9-1.8L192 397.5 37.9 507.5c-7.3 5.2-16.9 5.9-24.9 1.8S0 497 0 488L0 48z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Line 2: Address Bar (#address-bar / .addressBar) -->
+      <div id="address-bar" class="addressBar tabBar">
+        <!-- Navigation Buttons: Back, Forward, Reload, Home -->
+        <div class="navigationButtons">
+          <button id="nav-back-btn" class="systemButton historyButton historyBack" title="Back (Alt+Left)" aria-label="Back" disabled>
+            <svg viewBox="0 0 320 512" width="12" height="12"><path fill="currentColor" d="M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l192 192c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256 246.6 86.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-192 192z"/></svg>
+          </button>
+          <button id="nav-forward-btn" class="systemButton historyButton historyForward" title="Forward (Alt+Right)" aria-label="Forward" disabled>
+            <svg viewBox="0 0 320 512" width="12" height="12"><path fill="currentColor" d="M310.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L242.7 256 73.4 86.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l192 192z"/></svg>
+          </button>
+          <button id="nav-reload-btn" class="systemButton historyButton refresh" title="Reload Tab" aria-label="Reload">
+            <svg viewBox="0 0 512 512" width="12" height="12"><path fill="currentColor" d="M463.5 224H472c13.3 0 24-10.7 24-24V72c0-9.7-5.8-18.5-14.8-22.2s-19.3-1.7-26.2 5.2L413.4 96.6c-87.6-86.5-228.7-86.2-315.8 1c-87.5 87.5-87.5 229.3 0 316.8s229.3 87.5 316.8 0c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0c-62.5 62.5-163.8 62.5-226.3 0s-62.5-163.8 0-226.3c62.2-62.2 162.7-62.5 225.3-1L327 183c-6.9 6.9-8.9 17.2-5.2 26.2s12.5 14.8 22.2 14.8H463.5z"/></svg>
+          </button>
+          <button id="nav-home-btn" class="systemButton historyButton navHome" title="Homepage" aria-label="Home">
+            <svg viewBox="0 0 576 512" width="12" height="12"><path fill="currentColor" d="M575.8 255.5c0 18-15 32.1-32 32.1h-32l.7 160.2c0 17-14 32.2-32 32.2h-64c-17.7 0-32-14.3-32-32V352c0-17.7-14.3-32-32-32h-64c-17.7 0-32 14.3-32 32v96c0 17.7-14.3 32-32 32H96c-17.7 0-32-14.3-32-32.2V287.6H32c-18 0-32-14-32-32.1 0-9 3-17 10-24L266.4 8c7-7 15-8 22-8s15 2 21 7l256.4 224.5c8 7 10 15 10 24z"/></svg>
+          </button>
+        </div>
+
+        <!-- Address Bar / JumpBox Input -->
+        <div id="jumpBox" class="jumpBox">
+          <div class="jumpBoxWrapper">
+            <a id="jumpbox-link" class="jumpboxLink" title="Navigate (GO)">&gt;</a>
+            <input
+              id="address-bar-input"
+              class="jumpBoxInput"
+              type="text"
+              value="/"
+              placeholder="Enter route or page ID (e.g. /page/1, /browse, /settings)"
+              aria-label="Address Bar"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <div id="browserActions" class="browserActions">
+              <div id="bookmark-star-btn" class="systemButton bookmarkStarBtn" title="Bookmark Current Page">
+                <svg viewBox="0 0 576 512" width="14" height="14"><path fill="currentColor" d="M316.9 18C311.6 7 300.4 0 288 0s-23.6 7-28.8 18L195.8 150.3 47.9 171.8c-12.1 1.8-22.1 10.5-25.5 22.2s.5 24.3 9.3 33l107 104.3-25.2 147.2c-2.1 12.1 3.1 24.1 13.1 30.9s23 7 33.5 1.4l130.8-68.8 130.8 68.8c10.5 5.5 23.5 5.4 33.5-1.4s15.2-18.8 13.1-30.9L460.9 331.3l107-104.3c8.8-8.6 12.7-21.2 9.3-33s-13.4-20.4-25.5-22.2L400.2 150.3 336.9 18z"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Address Bar Right Actions: Volume & Settings Buttons -->
+        <div class="addressActions">
+          <div id="volume-control-wrap" class="volumeControlWrap">
+            <button id="nav-volume-btn" class="systemButton sysActionButton volumeButton" type="button" title="Master Output Volume (100%)" aria-label="Master Output Volume" aria-expanded="false" aria-controls="volume-popover">
+              <svg id="nav-volume-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon>
+                <path class="vol-wave-low" d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                <path class="vol-wave-high" d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                <line class="vol-mute-x hidden" x1="16" y1="9" x2="22" y2="15"></line>
+                <line class="vol-mute-x hidden" x1="22" y1="9" x2="16" y2="15"></line>
+              </svg>
+            </button>
+            <div id="volume-popover" class="volumePopover hidden" role="dialog" aria-label="Master Output Volume">
+              <div class="volumePopoverHeader">
+                <button id="volume-mute-btn" class="systemButton volumeMuteBtn" type="button" title="Mute / Unmute" aria-label="Toggle Mute" aria-pressed="false">
+                  <svg id="volume-mute-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor"></polygon>
+                    <path class="vol-wave-low" d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    <path class="vol-wave-high" d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                    <line class="vol-mute-x hidden" x1="16" y1="9" x2="22" y2="15"></line>
+                    <line class="vol-mute-x hidden" x1="22" y1="9" x2="16" y2="15"></line>
+                  </svg>
+                </button>
+                <span class="volumePopoverTitle">OUTPUT</span>
+                <span id="volume-popover-value" class="volumePopoverValue">100%</span>
+              </div>
+              <div class="volumePopoverBody">
+                <input id="volume-popover-slider" class="volumeSlider" type="range" min="0" max="100" step="1" value="100" aria-label="Master Output Volume Slider" />
+              </div>
+            </div>
+          </div>
+          <button id="nav-settings-btn" class="systemButton sysActionButton settingsButton" title="Settings (⚙)" aria-label="Settings">
+            <svg viewBox="0 0 512 512" width="14" height="14"><path fill="currentColor" d="M495.9 166.6c3.2 8.7 .5 18.4-6.4 24.6l-43.3 39.4c1.1 8.3 1.7 16.8 1.7 25.4s-.6 17.1-1.7 25.4l43.3 39.4c6.9 6.2 9.6 15.9 6.4 24.6-4.4 11.9-9.7 23.3-15.8 34.3l-4.7 8.1c-6.6 11-14 21.4-22.1 31.2-5.9 7.2-15.7 9.6-24.5 6.8l-55.7-17.7c-13.4 10.3-28.2 18.9-44 25.4l-12.5 57.1c-2 9.1-9 16.3-18.2 17.8-13.8 2.3-28 3.5-42.5 3.5s-28.7-1.2-42.5-3.5c-9.2-1.5-16.2-8.7-18.2-17.8l-12.5-57.1c-15.8-6.5-30.6-15.1-44-25.4l-55.7 17.7c-8.8 2.8-18.6 .4-24.5-6.8-8.1-9.8-15.5-20.2-22.1-31.2l-4.7-8.1c-6.1-11-11.4-22.4-15.8-34.3-3.2-8.7-.5-18.4 6.4-24.6l43.3-39.4c-1.1-8.4-1.7-16.9-1.7-25.5s.6-17.1 1.7-25.4l-43.3-39.4c-6.9-6.2-9.6-15.9-6.4-24.6 4.4-11.9 9.7-23.3 15.8-34.3l4.7-8.1c6.6-11 14-21.4 22.1-31.2 5.9-7.2 15.7-9.6 24.5-6.8l55.7 17.7c13.4-10.3 28.2-18.9 44-25.4l12.5-57.1c2-9.1 9-16.3 18.2-17.8C227.3 1.2 241.5 0 256 0s28.7 1.2 42.5 3.5c9.2 1.5 16.2 8.7 18.2 17.8l12.5 57.1c15.8 6.5 30.6 15.1 44 25.4l55.7-17.7c8.8-2.8 18.6-.4 24.5 6.8 8.1 9.8 15.5 20.2 22.1 31.2l4.7 8.1c6.1 11 11.4 22.4 15.8 34.3zM256 336a80 80 0 1 0 0-160 80 80 0 1 0 0 160z"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Bookmarks & Saved Games Drawer -->
+    <aside id="bookmarks-drawer" class="bookmarksDrawer hidden" aria-label="Saved Game Bookmarks">
+      <div class="drawerHeader">
+        <h3>SAVED GAMES &amp; BOOKMARKS</h3>
+        <button id="bookmarks-close-btn" class="drawerCloseBtn" aria-label="Close Bookmarks">&times;</button>
+      </div>
+      <div class="drawerActions">
+        <button id="new-save-btn" class="primaryActionBtn">+ Save Current Page</button>
+      </div>
+      <div id="bookmarks-list" class="bookmarksList"></div>
+    </aside>
+
+    <!-- Main Viewport Container -->
+    <main id="tab-viewport" class="tabFrame">
+      <div id="page-container" class="pageBody" data-theme="default">
+        <!-- Reader Navigation Banner -->
+        <nav id="reader-nav-banner" class="navBanner customNavBanner" aria-label="Reader Navigation">
+          <div class="navList">
+            <ul class="nav1">
+              <li><a href="/" data-route="/">HOME</a></li>
+            </ul>
+            <div class="navSeparator"></div>
+            <ul class="nav2">
+              <li><a href="/browse" data-route="/browse">BROWSE</a></li>
+            </ul>
+            <div class="navSeparator"></div>
+            <ul class="nav3">
+              <li><a href="/search" data-route="/search">SEARCH</a></li>
+            </ul>
+            <div class="navSeparator"></div>
+            <ul class="nav4">
+              <li><a href="/music" data-route="/music">MUSIC</a></li>
+            </ul>
+            <div class="navSeparator"></div>
+            <ul class="nav5">
+              <li><a href="/settings" data-route="/settings">SETTINGS</a></li>
+            </ul>
+          </div>
+        </nav>
+
+        <!-- Page Frame (950px frame with 650px inner pageContent) -->
+        <div id="page-frame" class="pageFrame">
+          <div id="page-banner-container" class="bannerDiv" style="display:none;"></div>
+          <div id="page-content" class="pageContent">
+            <h2 id="page-title" class="pageTitle">RRWR</h2>
+            <div id="media-container" class="mediaContent"></div>
+            <div id="text-container" class="textContent">
+              <p id="status" class="storyParagraph">Initializing RRWR...</p>
+            </div>
+            <div id="command-container" class="commandContent"></div>
+            <div id="footer-nav" class="footerNav"></div>
+          </div>
+        </div>
+
+        <!-- Page Footer -->
+        <footer id="page-footer" class="footer"></footer>
+      </div>
+    </main>
+
+    <!-- Persistent Sound Test / Music Mini-Player Bar -->
+    <section id="sound-test-bar" class="soundTestBar hidden" aria-label="Sound Test Audio Player">
+      <div class="soundTestInfo">
+        <span class="soundTestEq" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+        <div class="soundTestTextStack">
+          <span id="sound-test-title" class="soundTestTitle">No track loaded</span>
+          <span id="sound-test-meta" class="soundTestMeta"></span>
+        </div>
+      </div>
+      <div class="soundTestControls">
+        <div class="soundTestTransport">
+          <button id="sound-test-play-btn" class="soundTestBtn" title="Play / Pause">&#9654;</button>
+          <button id="sound-test-stop-btn" class="soundTestBtn" title="Stop">&#9632;</button>
+        </div>
+        <div class="soundTestSeekRow">
+          <span id="sound-test-current-time" class="soundTestTime">0:00</span>
+          <input id="sound-test-seek" type="range" class="soundTestSeekSlider" min="0" max="100" value="0" step="0.1" aria-label="Seek track" />
+          <span id="sound-test-duration" class="soundTestTime">0:00</span>
+        </div>
+        <audio id="sound-test-audio" preload="metadata"></audio>
+      </div>
+      <div class="soundTestRight">
+        <div class="soundTestVolumeGroup">
+          <button id="sound-test-mute-btn" class="soundTestMuteBtn" title="Mute / Unmute" aria-label="Mute or unmute">
+            <svg id="sound-test-mute-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path class="vol-wave-low" d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+              <path class="vol-wave-high" d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+              <line class="vol-mute-x hidden" x1="23" y1="9" x2="17" y2="15"></line>
+              <line class="vol-mute-x hidden" x1="17" y1="9" x2="23" y2="15"></line>
+            </svg>
+          </button>
+          <input id="sound-test-volume" type="range" class="soundTestVolumeSlider" min="0" max="100" value="100" aria-label="Volume" />
+          <span id="sound-test-volume-pct" class="soundTestVolPct">100%</span>
+        </div>
+        <button id="sound-test-close-btn" class="soundTestCloseBtn" title="Close Player">&times;</button>
+      </div>
+    </section>
+
+    <!-- Floating URL Tooltip (Bottom Left) -->
+    <div id="url-tooltip" class="urlTooltip hidden" aria-hidden="true"></div>
+  </div>
+
+  <!-- Modular Frontend Subsystem Scripts -->
+  <script src="/js/flashProps.js"></script>
+  <script src="/js/mediaEngine.js"></script>
+  <script src="/js/modHooks.js"></script>
+  <script src="/js/perfMonitor.js"></script>
+  <script src="/js/animations.js"></script>
+  <script src="/js/genericIcons.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/debugHud.js"></script>
+</body>
+</html>

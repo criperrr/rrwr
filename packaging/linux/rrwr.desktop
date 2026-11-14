@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=RRWR
+Comment=Rust-Ruffle WebComic Reader
+Exec=rrwr
+Icon=rrwr
+Terminal=false
+Type=Application
+Categories=Game;Utility;
+StartupWMClass=com.rrwr.app

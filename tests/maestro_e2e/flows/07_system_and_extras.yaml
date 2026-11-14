@@ -1,0 +1,21 @@
+appId: com.rrwr.app
+---
+- launchApp
+- tapOn:
+    text: "RETRO READER"
+    optional: true
+- assertVisible:
+    text: ".*Sample WebComic.*"
+- tapOn:
+    text: "SEARCH"
+- takeScreenshot: "07_system_01_search_page"
+- tapOn:
+    text: "NEWS"
+- takeScreenshot: "07_system_02_newsposts_archive"
+- swipe:
+    start: "50%,70%"
+    end: "50%,30%"
+- takeScreenshot: "07_system_03_newsposts_scrolled"
+- tapOn:
+    text: "CREDITS"
+- takeScreenshot: "07_system_05_credits_page"

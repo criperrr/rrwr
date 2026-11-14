@@ -1,0 +1,30 @@
+appId: com.rrwr.app
+---
+- launchApp
+- tapOn:
+    text: "RETRO READER"
+    optional: true
+- assertVisible:
+    text: ".*Sample WebComic.*"
+- scrollUntilVisible:
+    element:
+      text: ".*Begin Reading.*"
+    direction: DOWN
+- tapOn:
+    text: ".*Begin Reading.*"
+- assertVisible:
+    text: ".*young explorer stands in a quiet room.*"
+- takeScreenshot: "02_route_story_000001"
+- takeScreenshot: "02_story_01_000001_top"
+- swipe:
+    start: "50%,70%"
+    end: "50%,30%"
+- takeScreenshot: "02_story_02_000001_content"
+- swipe:
+    start: "50%,70%"
+    end: "50%,30%"
+- takeScreenshot: "02_story_03_000001_commands"
+- tapOn:
+    text: ".*==>.*"
+    optional: true
+- takeScreenshot: "02_story_04_000002_choose_name"

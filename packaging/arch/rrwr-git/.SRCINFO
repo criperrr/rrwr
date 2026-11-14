@@ -1,0 +1,23 @@
+pkgbase = rrwr-git
+	pkgdesc = RRWR - Rust-Ruffle WebComic Reader desktop app (builds main branch)
+	pkgver = 2.8.1.r0.g0000000
+	pkgrel = 1
+	url = https://github.com/criperrr/RRWR-rust
+	arch = x86_64
+	license = custom
+	makedepends = git
+	makedepends = rust
+	makedepends = cargo
+	makedepends = pkgconf
+	makedepends = openssl
+	depends = webkit2gtk-4.1
+	depends = gtk3
+	depends = libayatana-appindicator
+	provides = rrwr
+	conflicts = rrwr
+	conflicts = rrwr-bin
+	conflicts = rrwr-dev-git
+	source = rrwr::git+https://github.com/criperrr/RRWR-rust.git#branch=main
+	sha256sums = SKIP
+
+pkgname = rrwr-git

@@ -1,0 +1,29 @@
+appId: com.rrwr.app
+---
+- launchApp
+- tapOn:
+    text: "RETRO READER"
+    optional: true
+- assertVisible:
+    text: ".*Sample WebComic.*"
+- tapOn:
+    text: "MAP"
+- assertVisible:
+    text: ".*Map.*"
+- takeScreenshot: "04_maps_01_story_map_top"
+- swipe:
+    start: "50%,70%"
+    end: "50%,30%"
+- takeScreenshot: "04_maps_02_story_map_acts"
+- swipe:
+    start: "50%,30%"
+    end: "50%,70%"
+- tapOn:
+    text: "LOG"
+- assertVisible:
+    text: ".*Log.*"
+- takeScreenshot: "04_logs_01_adventure_log_top"
+- swipe:
+    start: "50%,70%"
+    end: "50%,30%"
+- takeScreenshot: "04_logs_02_adventure_log_scrolled"

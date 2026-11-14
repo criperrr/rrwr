@@ -1,0 +1,146 @@
+{
+  "albums": {
+    "bonus-tracks": {
+      "name": "Bonus Tracks",
+      "artists": null,
+      "albumCoverArtists": [
+        {
+          "who": "sample-artist",
+          "what": null
+        }
+      ],
+      "commentary": null,
+      "directory": "bonus-tracks",
+      "tracks": [
+        "quiet-room",
+        "balcony-view"
+      ],
+      "hasTrackArt": false,
+      "date": null,
+      "urls": [],
+      "bonus": [],
+      "usesGroups": true
+    },
+    "sample-vol-1": {
+      "name": "Sample Vol. 1",
+      "artists": null,
+      "albumCoverArtists": [
+        {
+          "who": "sample-artist",
+          "what": null
+        }
+      ],
+      "commentary": null,
+      "directory": "volume-1",
+      "tracks": [
+        "opening-theme"
+      ],
+      "hasTrackArt": false,
+      "date": "2009-08-14T00:00:00.000Z",
+      "urls": [],
+      "bonus": [],
+      "usesGroups": false
+    }
+  },
+  "tracks": {
+    "opening-theme": {
+      "name": "Opening Theme",
+      "artists": [
+        {
+          "who": "sample-composer",
+          "what": null
+        }
+      ],
+      "album": [
+        "sample-vol-1"
+      ],
+      "commentary": null,
+      "contributors": [],
+      "coverArtists": null,
+      "duration": 96,
+      "lyrics": null,
+      "references": [],
+      "referencedBy": [
+        "quiet-room"
+      ],
+      "date": null,
+      "directory": "opening-theme",
+      "bandcampId": null,
+      "urls": [],
+      "group": "Tracks featured in Sample WebComic",
+      "pages": [
+        "000001"
+      ]
+    },
+    "quiet-room": {
+      "name": "Quiet Room",
+      "artists": [
+        {
+          "who": "sample-composer",
+          "what": null
+        }
+      ],
+      "album": [
+        "bonus-tracks"
+      ],
+      "commentary": null,
+      "contributors": [],
+      "coverArtists": null,
+      "duration": 120,
+      "lyrics": null,
+      "references": [
+        "opening-theme"
+      ],
+      "referencedBy": [],
+      "date": null,
+      "directory": "quiet-room",
+      "bandcampId": null,
+      "urls": [],
+      "group": "Tracks featured in Sample WebComic",
+      "pages": [
+        "000004"
+      ]
+    },
+    "balcony-view": {
+      "name": "Balcony View",
+      "artists": [
+        {
+          "who": "sample-composer",
+          "what": null
+        }
+      ],
+      "album": [
+        "bonus-tracks"
+      ],
+      "commentary": null,
+      "contributors": [],
+      "coverArtists": null,
+      "duration": 85,
+      "lyrics": null,
+      "references": [],
+      "referencedBy": [],
+      "date": null,
+      "directory": "balcony-view",
+      "bandcampId": null,
+      "urls": [],
+      "group": "Tracks featured in Sample WebComic",
+      "pages": [
+        "000006"
+      ]
+    }
+  },
+  "flashes": {
+    "000005": {
+      "date": "2009-04-21T01:00:00.000Z",
+      "tracks": [
+        "opening-theme"
+      ]
+    },
+    "000007": {
+      "date": "2010-05-05T01:00:00.000Z",
+      "tracks": [
+        "quiet-room"
+      ]
+    }
+  }
+}
