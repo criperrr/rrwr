@@ -1536,172 +1536,1745 @@ nav.navBanner,
 }
 
 /* Persistent Bottom Sound Test Bar */
+/* --------------------------------------------------------------------------
+   9. Floating Retro MP3 Player Widget (Scoped Monet + AOSP Squiggly Seekbar)
+   -------------------------------------------------------------------------- */
 .soundTestBar {
+  --mp-shell-bg: #1e2124;
+  --mp-shell-surface: #2b2f34;
+  --mp-shell-surface-hover: #373c42;
+  --mp-shell-border: #687078;
+  --mp-shell-bevel: rgba(255, 255, 255, 0.16);
+  --mp-shell-shadow: rgba(0, 0, 0, 0.58);
+  --mp-lcd-bg: #101316;
+  --mp-lcd-border: #4b525a;
+  --mp-lcd-text: #eef1f5;
+  --mp-lcd-subtext: #a8b0ba;
+  --mp-accent: #e0e6ed;
+  --mp-accent-on: #111316;
+  --mp-accent-soft: rgba(224, 230, 237, 0.2);
+  --mp-track-inactive: rgba(200, 208, 218, 0.28);
+  --mp-text: #eef1f5;
+  --mp-text-muted: #aeb6c2;
+
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 48px;
-  background-color: #1e1e1e;
-  color: #ffffff;
-  border-top: 2px solid #29ff4a;
+  bottom: 14px;
+  right: 14px;
+  left: auto;
+  width: var(--mp-player-w, 312px);
+  height: var(--mp-player-h, 160px);
+  min-width: 204px;
+  min-height: 96px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  background-color: var(--mp-shell-bg);
+  color: var(--mp-text);
+  border: 2px solid var(--mp-shell-border);
+  box-shadow:
+    inset 1px 1px 0 var(--mp-shell-bevel),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.45),
+    4px 4px 0 var(--mp-shell-shadow);
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: space-between;
-  padding: 0 16px;
+  gap: 8px;
+  padding: 8px 10px 10px 10px;
+  box-sizing: border-box;
   z-index: 200;
   font-family: var(--font-family-ui, "Courier Prime", "Courier New", monospace);
   font-size: 12px;
+  cursor: grab;
+  touch-action: none;
+  overflow: visible;
+  --mp-origin: bottom right;
+  --mp-dir-x: 1;
+  --mp-dir-y: 1;
+  --mp-anchor-x: 10px;
+  --mp-anchor-y: 10px;
+  transform-origin: var(--mp-origin);
+  transition: background-color 220ms ease, border-color 220ms ease, color 220ms ease;
 }
 
-.soundTestInfo {
+#app .soundTestBar,
+#app .soundTestSnapOverlay,
+#app .soundTestReopenBtn {
+  --mp-cel-steps-2: 2;
+  --mp-cel-steps-3: 3;
+  --mp-cel-steps-4: 4;
+  --mp-cel-steps-5: 5;
+  --mp-step-2: steps(2, end);
+  --mp-step-3: steps(3, end);
+  --mp-step-4: steps(4, end);
+  --mp-step-5: steps(5, end);
+  --mp-cel-dt-ms: 42ms;
+  --mp-boing-ease: cubic-bezier(0.22, 1.38, 0.36, 1);
+  --mp-snap-ease: cubic-bezier(0.2, 1.32, 0.34, 1);
+  --mp-zip-ease: cubic-bezier(0.55, 0.04, 0.88, 0.36);
+  --mp-pop-ease: cubic-bezier(0.2, 1.42, 0.38, 1);
+  --mp-settle-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#app[data-anim-fps="24"] .soundTestBar,
+#app[data-anim-fps="24"] .soundTestSnapOverlay,
+#app[data-anim-fps="24"] .soundTestReopenBtn {
+  --mp-cel-dt-ms: 42ms;
+}
+
+#app[data-anim-fps="12"] .soundTestBar,
+#app[data-anim-fps="12"] .soundTestSnapOverlay,
+#app[data-anim-fps="12"] .soundTestReopenBtn {
+  --mp-cel-steps-3: 2;
+  --mp-cel-steps-4: 3;
+  --mp-cel-steps-5: 3;
+  --mp-step-3: steps(2, end);
+  --mp-step-4: steps(3, end);
+  --mp-step-5: steps(3, end);
+  --mp-cel-dt-ms: 84ms;
+}
+
+.soundTestBar[data-corner="bottom-right"],
+.soundTestBar[data-corner="right"],
+.soundTestReopenBtn[data-corner="bottom-right"],
+.soundTestReopenBtn[data-corner="right"] {
+  --mp-origin: bottom right;
+  --mp-dir-x: 1;
+  --mp-dir-y: 1;
+  --mp-anchor-x: 10px;
+  --mp-anchor-y: 10px;
+}
+
+.soundTestCornerAnchorWeb {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  right: -13px;
+  bottom: -13px;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.34;
+  transform-origin: center;
+  transform: scale(var(--mp-dir-x, 1), var(--mp-dir-y, 1));
+  transition: opacity 150ms ease, transform 180ms var(--mp-boing-ease, cubic-bezier(0.22, 1.38, 0.36, 1));
+}
+
+.soundTestAnchorFilament,
+.soundTestAnchorBridge {
+  fill: none;
+  stroke: var(--mp-accent);
+  stroke-linecap: round;
+}
+
+.soundTestAnchorFilament {
+  stroke-width: 1.4;
+}
+
+.soundTestAnchorBridge {
+  stroke-width: 1.1;
+  stroke-dasharray: 2 3;
+}
+
+@keyframes mpAnchorThreadTighten {
+  0% {
+    stroke-dashoffset: 18;
+    opacity: 0.25;
+  }
+  50% {
+    stroke-dashoffset: 4;
+    opacity: 0.95;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar:hover .soundTestCornerAnchorWeb,
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar:focus-within .soundTestCornerAnchorWeb {
+  opacity: 0.56;
+  transform: scale(var(--mp-dir-x, 1), var(--mp-dir-y, 1)) scale(1.06);
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-resizing .soundTestCornerAnchorWeb {
+  opacity: calc(0.45 + var(--mp-resize-strain, 0) * 0.45);
+  transform: scale(var(--mp-dir-x, 1), var(--mp-dir-y, 1)) scale(calc(1 + var(--mp-resize-strain, 0) * 0.14));
+  transition: none;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-resizing .soundTestAnchorFilament,
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-resizing .soundTestAnchorBridge {
+  opacity: 1;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-snapped .soundTestAnchorFilament,
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.soundbar-open .soundTestAnchorFilament {
+  stroke-dasharray: 48;
+  animation: mpAnchorThreadTighten 210ms var(--mp-step-4, steps(4, end)) forwards;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-snapped .soundTestAnchorBridge,
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.soundbar-open .soundTestAnchorBridge {
+  animation: mpAnchorThreadTighten 210ms var(--mp-step-4, steps(4, end)) forwards;
+}
+
+.soundTestBar[data-corner="bottom-left"] .soundTestCornerAnchorWeb,
+.soundTestBar[data-corner="left"] .soundTestCornerAnchorWeb {
+  left: -13px;
+  right: auto;
+  bottom: -13px;
+  top: auto;
+}
+
+.soundTestBar[data-corner="top-right"] .soundTestCornerAnchorWeb {
+  right: -13px;
+  left: auto;
+  top: -13px;
+  bottom: auto;
+}
+
+.soundTestBar[data-corner="top-left"] .soundTestCornerAnchorWeb {
+  left: -13px;
+  right: auto;
+  top: -13px;
+  bottom: auto;
+}
+
+.soundTestResizeGrip {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  z-index: 6;
+  cursor: nwse-resize;
+  touch-action: none;
+  opacity: 0.62;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.soundTestResizeGrip::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  background: linear-gradient(
+    -45deg,
+    transparent 0 36%,
+    var(--mp-accent) 36% 48%,
+    transparent 48% 66%,
+    var(--mp-accent) 66% 78%,
+    transparent 78%
+  );
+  opacity: 0.78;
+}
+
+.soundTestResizeGrip:hover,
+.soundTestResizeGrip:focus-visible,
+.soundTestBar.is-resizing .soundTestResizeGrip {
+  opacity: 1;
+  outline: none;
+}
+
+.soundTestBar[data-corner="bottom-right"] .soundTestResizeGrip,
+.soundTestBar[data-corner="right"] .soundTestResizeGrip {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+
+.soundTestBar[data-corner="bottom-right"] .soundTestResizeGrip::before,
+.soundTestBar[data-corner="right"] .soundTestResizeGrip::before {
+  background: linear-gradient(
+    135deg,
+    transparent 0 28%,
+    var(--mp-accent) 28% 40%,
+    transparent 40% 56%,
+    var(--mp-accent) 56% 68%,
+    transparent 68%
+  );
+}
+
+.soundTestBar[data-corner="bottom-left"] .soundTestResizeGrip,
+.soundTestBar[data-corner="left"] .soundTestResizeGrip {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+
+.soundTestBar[data-corner="bottom-left"] .soundTestResizeGrip::before,
+.soundTestBar[data-corner="left"] .soundTestResizeGrip::before {
+  background: linear-gradient(
+    225deg,
+    transparent 0 28%,
+    var(--mp-accent) 28% 40%,
+    transparent 40% 56%,
+    var(--mp-accent) 56% 68%,
+    transparent 68%
+  );
+}
+
+.soundTestBar[data-corner="top-right"] .soundTestResizeGrip {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+
+.soundTestBar[data-corner="top-right"] .soundTestResizeGrip::before {
+  background: linear-gradient(
+    45deg,
+    transparent 0 28%,
+    var(--mp-accent) 28% 40%,
+    transparent 40% 56%,
+    var(--mp-accent) 56% 68%,
+    transparent 68%
+  );
+}
+
+.soundTestBar[data-corner="top-left"] .soundTestResizeGrip {
+  bottom: 0;
+  right: 0;
+  cursor: nwse-resize;
+}
+
+.soundTestBar.is-minimized .soundTestResizeGrip,
+.soundTestBar.is-dragging .soundTestResizeGrip {
+  display: none;
+}
+
+.soundTestBar.is-resizing {
+  user-select: none;
+  transition: none !important;
+  border-color: var(--mp-accent);
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-resizing {
+  transform: translate(
+    calc(var(--mp-dir-x, 1) * var(--mp-resize-strain, 0) * -2px),
+    calc(var(--mp-dir-y, 1) * var(--mp-resize-strain, 0) * -2px)
+  );
+}
+
+@keyframes mpGripSilkCue {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.25); }
+  100% { transform: scale(1.1); }
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestResizeGrip:hover::before,
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestResizeGrip:focus-visible::before {
+  animation: mpGripSilkCue 180ms var(--mp-step-3, steps(3, end)) forwards;
+}
+
+@keyframes mpResizeRubberSettle {
+  0%   { transform: scale(1.035, 0.965); }
+  45%  { transform: scale(0.985, 1.015); }
+  78%  { transform: scale(1.006, 0.996); }
+  100% { transform: scale(1, 1); }
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-resize-settling {
+  animation: mpResizeRubberSettle 250ms var(--mp-boing-ease, cubic-bezier(0.22, 1.38, 0.36, 1)) both;
+}
+
+@keyframes mpTierFrameKick {
+  0%   { transform: scale(0.975, 1.028); }
+  50%  { transform: scale(1.018, 0.988); }
+  100% { transform: scale(1, 1); }
+}
+
+@keyframes mpTierSlotPopIn {
+  0%   { opacity: 0; transform: scale(0.76); }
+  65%  { opacity: 1; transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes mpTierLcdSnap {
+  0%   { transform: scaleY(0.94); opacity: 0.85; }
+  60%  { transform: scaleY(1.02); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-tier-transitioning {
+  animation: mpTierFrameKick 205ms var(--mp-boing-ease, cubic-bezier(0.22, 1.38, 0.36, 1)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-tier-transitioning .soundTestLcdPanel {
+  transform-origin: center top;
+  animation: mpTierLcdSnap 175ms var(--mp-step-3, steps(3, end)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-tier-transitioning[data-tier-dir="up"] .soundTestArtWrap:not(.hidden),
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-tier-transitioning[data-tier-dir="up"] .soundTestArtistLine:not(:empty),
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-tier-transitioning[data-tier-dir="up"] .soundTestProgressPct,
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-tier-transitioning[data-tier-dir="up"] .soundTestFormatTag:not(:empty) {
+  animation: mpTierSlotPopIn 195ms var(--mp-pop-ease, cubic-bezier(0.2, 1.42, 0.38, 1)) both;
+}
+
+.soundTestBar[data-corner="bottom-right"] .soundTestChassisHeader,
+.soundTestBar[data-corner="right"] .soundTestChassisHeader {
+  padding-left: 12px;
+}
+
+.soundTestBar[data-corner="bottom-left"] .soundTestChassisHeader,
+.soundTestBar[data-corner="left"] .soundTestChassisHeader {
+  padding-right: 14px;
+}
+
+.soundTestBar[data-corner="top-right"] .soundTestDeckControls {
+  padding-left: 12px;
+}
+
+.soundTestBar[data-corner="top-left"] .soundTestDeckControls {
+  padding-right: 12px;
+}
+
+.soundTestBar[data-corner="bottom-left"],
+.soundTestBar[data-corner="left"] {
+  --mp-origin: bottom left;
+  --mp-dir-x: -1;
+  --mp-dir-y: 1;
+  --mp-anchor-x: -10px;
+  --mp-anchor-y: 10px;
+  left: 14px;
+  right: auto;
+  bottom: 14px;
+  top: auto;
+}
+
+.soundTestBar[data-corner="top-right"] {
+  --mp-origin: top right;
+  --mp-dir-x: 1;
+  --mp-dir-y: -1;
+  --mp-anchor-x: 10px;
+  --mp-anchor-y: -10px;
+  top: var(--mp-top-safe, 84px);
+  bottom: auto;
+  right: 14px;
+  left: auto;
+}
+
+.soundTestBar[data-corner="top-left"] {
+  --mp-origin: top left;
+  --mp-dir-x: -1;
+  --mp-dir-y: -1;
+  --mp-anchor-x: -10px;
+  --mp-anchor-y: -10px;
+  top: var(--mp-top-safe, 84px);
+  bottom: auto;
+  left: 14px;
+  right: auto;
+}
+
+.soundTestBar.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+  transition: none !important;
+  transform: scale(1.03) rotate(var(--mp-drag-tilt, 0deg));
+  box-shadow:
+    inset 1px 1px 0 var(--mp-shell-bevel),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.45),
+    10px 14px 0 var(--mp-shell-shadow);
+}
+
+.soundTestBar.is-snapping {
+  user-select: none;
+  pointer-events: none;
+  transition: none !important;
+  transform: rotate(var(--mp-drag-tilt, 0deg));
+}
+
+@keyframes mpCornerWebStick {
+  0% {
+    transform: translate(calc(var(--mp-dir-x, 1) * 4px), calc(var(--mp-dir-y, 1) * 4px)) scale(1.045, 0.945);
+  }
+  35% {
+    transform: translate(calc(var(--mp-dir-x, 1) * -2px), calc(var(--mp-dir-y, 1) * -2px)) scale(0.965, 1.035);
+  }
+  68% {
+    transform: translate(calc(var(--mp-dir-x, 1) * 1px), calc(var(--mp-dir-y, 1) * 1px)) scale(1.012, 0.99);
+  }
+  100% {
+    transform: translate(0, 0) scale(1, 1);
+  }
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-snapped {
+  animation: mpCornerWebStick 280ms var(--mp-boing-ease, cubic-bezier(0.22, 1.38, 0.36, 1)) both;
+}
+
+@keyframes mpDockMarchStepped {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -48;
+  }
+}
+
+@keyframes mpDockBracketSnap {
+  0% {
+    transform: scale(1.04);
+    opacity: 0.72;
+  }
+  55% {
+    transform: scale(0.985);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes mpDockCornerFlash {
+  0%   { opacity: 0.4; transform: scale(1.35); }
+  60%  { opacity: 1; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes mpWebFlowMain {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -36;
+  }
+}
+
+@keyframes mpWebFlowForward {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+@keyframes mpWebFlowReverse {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 28;
+  }
+}
+
+@keyframes mpWebCrossTension {
+  0%   { opacity: 0.35; stroke-dashoffset: 0; }
+  50%  { opacity: 0.92; stroke-dashoffset: -7; }
+  100% { opacity: 0.68; stroke-dashoffset: -14; }
+}
+
+@keyframes mpWebNodeCelPulse {
+  0%, 100% {
+    transform: scale(0.86);
+    opacity: 0.72;
+  }
+  50% {
+    transform: scale(1.26);
+    opacity: 1;
+  }
+}
+
+@keyframes mpCornerRippleOuter {
+  0% {
+    transform: translate(-50%, -50%) scale(0.22);
+    opacity: 0.92;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.8);
+    opacity: 0;
+  }
+}
+
+@keyframes mpCornerAnchorPopInner {
+  0% {
+    transform: translate(-50%, -50%) scale(0.35);
+    opacity: 0.95;
+  }
+  55% {
+    transform: translate(-50%, -50%) scale(1.35);
+    opacity: 0.75;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0;
+  }
+}
+
+.soundTestSnapOverlay {
+  --mp-accent: #e0e6ed;
+  --mp-accent-soft: rgba(224, 230, 237, 0.2);
+
+  position: fixed;
+  inset: 0;
+  z-index: 198;
+  pointer-events: none;
+}
+
+.soundTestSnapOverlay.hidden {
+  display: none;
+}
+
+.soundTestTetherSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.soundTestTetherMain {
+  fill: none;
+  stroke: var(--mp-accent);
+  stroke-width: var(--mp-tether-w, 2.2);
+  stroke-dasharray: 6 5;
+  stroke-linecap: round;
+  opacity: 0.88;
+}
+
+.soundTestTetherSub {
+  fill: none;
+  stroke: var(--mp-accent);
+  stroke-width: 1.3;
+  stroke-dasharray: 4 5;
+  stroke-linecap: round;
+  opacity: 0.48;
+}
+
+.soundTestTetherCross {
+  fill: none;
+  stroke: var(--mp-accent);
+  stroke-width: 1.1;
+  stroke-dasharray: 3 4;
+  stroke-linecap: round;
+  opacity: 0.4;
+}
+
+.soundTestTetherNode {
+  fill: var(--mp-accent);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+#app[data-animations-enabled="true"] .soundTestSnapOverlay:not(.hidden):not(.is-plucking) .soundTestTetherMain {
+  animation: mpWebFlowMain var(--mp-tether-flow-ms, 420ms) var(--mp-step-4, steps(4, end)) infinite;
+}
+
+#app[data-animations-enabled="true"] .soundTestSnapOverlay:not(.hidden):not(.is-plucking) #sound-test-tether-sub1 {
+  animation: mpWebFlowForward calc(var(--mp-tether-flow-ms, 420ms) * 1.35) var(--mp-step-4, steps(4, end)) infinite;
+}
+
+#app[data-animations-enabled="true"] .soundTestSnapOverlay:not(.hidden):not(.is-plucking) #sound-test-tether-sub2 {
+  animation: mpWebFlowReverse calc(var(--mp-tether-flow-ms, 420ms) * 1.45) var(--mp-step-4, steps(4, end)) infinite;
+}
+
+#app[data-animations-enabled="true"] .soundTestSnapOverlay:not(.hidden):not(.is-plucking) .soundTestTetherCross.is-tense {
+  animation: mpWebCrossTension 240ms var(--mp-step-3, steps(3, end)) infinite alternate;
+}
+
+#app[data-animations-enabled="true"] .soundTestSnapOverlay:not(.hidden):not(.is-plucking) .soundTestTetherNode {
+  animation: mpWebNodeCelPulse 660ms var(--mp-step-4, steps(4, end)) infinite;
+}
+
+.soundTestSnapOverlay.is-plucking .soundTestTetherMain,
+.soundTestSnapOverlay.is-plucking .soundTestTetherSub,
+.soundTestSnapOverlay.is-plucking .soundTestTetherCross {
+  stroke-dasharray: none;
+  animation: none;
+}
+
+.soundTestSnapOverlay.is-plucking .soundTestTetherNode {
+  animation: none;
+}
+
+.soundTestDockTarget {
+  position: fixed;
+  background-color: var(--mp-accent-soft);
+  box-shadow: inset 0 0 16px var(--mp-accent-soft);
+  transition: left 130ms cubic-bezier(0.22, 1, 0.36, 1),
+              top 130ms cubic-bezier(0.22, 1, 0.36, 1),
+              width 130ms cubic-bezier(0.22, 1, 0.36, 1),
+              height 130ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.soundTestSnapOverlay.is-plucking .soundTestDockTarget {
+  opacity: 0;
+}
+
+.soundTestDockSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.soundTestDockRect {
+  fill: none;
+  stroke: var(--mp-accent);
+  stroke-width: 2;
+  stroke-dasharray: 7 5;
+  stroke-linecap: square;
+  opacity: 0.92;
+}
+
+#app[data-animations-enabled="true"] .soundTestSnapOverlay:not(.hidden):not(.is-plucking) .soundTestDockRect {
+  animation: mpDockMarchStepped 840ms steps(6, end) infinite;
+}
+
+#app[data-anim-fps="12"] .soundTestSnapOverlay:not(.hidden):not(.is-plucking) .soundTestDockRect {
+  animation: mpDockMarchStepped 840ms steps(4, end) infinite;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestDockTarget.is-corner-locked {
+  animation: mpDockBracketSnap 180ms var(--mp-pop-ease, cubic-bezier(0.2, 1.42, 0.38, 1)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestDockTarget.is-corner-locked .soundTestDockCorner {
+  animation: mpDockCornerFlash 180ms var(--mp-step-3, steps(3, end)) both;
+}
+
+.soundTestDockCorner {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-color: var(--mp-accent);
+  border-style: solid;
+  border-width: 0;
+}
+
+.soundTestDockCorner.tl { top: -2px; left: -2px; border-top-width: 2px; border-left-width: 2px; }
+.soundTestDockCorner.tr { top: -2px; right: -2px; border-top-width: 2px; border-right-width: 2px; }
+.soundTestDockCorner.bl { bottom: -2px; left: -2px; border-bottom-width: 2px; border-left-width: 2px; }
+.soundTestDockCorner.br { bottom: -2px; right: -2px; border-bottom-width: 2px; border-right-width: 2px; }
+
+.soundTestCornerRipple {
+  position: fixed;
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--mp-accent);
+  background-color: var(--mp-accent-soft);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.soundTestCornerRipple::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--mp-accent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestCornerRipple:not(.hidden) {
+  animation: mpCornerRippleOuter 320ms var(--mp-settle-ease, cubic-bezier(0.22, 1, 0.36, 1)) forwards;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestCornerRipple:not(.hidden)::after {
+  animation: mpCornerAnchorPopInner 260ms var(--mp-pop-ease, cubic-bezier(0.2, 1.42, 0.38, 1)) forwards;
+}
+
+.soundTestCornerRipple.hidden {
+  display: none;
+}
+
+.soundTestBar audio {
+  display: none;
+}
+
+.soundTestChassisHeader {
   display: flex;
-  flex-direction: row;
   align-items: center;
-  gap: 10px;
-  min-width: 180px;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--mp-shell-border);
+  padding-bottom: 5px;
+  cursor: grab;
+  flex-shrink: 0;
 }
 
-.soundTestTextStack {
+.soundTestBar.is-dragging .soundTestChassisHeader,
+.soundTestBar.is-dragging .soundTestMiniStrip {
+  cursor: grabbing;
+}
+
+.soundTestBrandGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.soundTestLed {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  background-color: var(--mp-track-inactive);
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  flex-shrink: 0;
+}
+
+.soundTestLed::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 1px solid var(--mp-accent);
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.8);
+}
+
+.soundTestBar.is-playing .soundTestLed {
+  background-color: var(--mp-accent);
+  box-shadow: 0 0 4px var(--mp-accent);
+}
+
+.soundTestBrandLabel {
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  color: var(--mp-text);
+}
+
+.soundTestModeBadge {
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  padding: 1px 5px;
+  border: 1px solid var(--mp-shell-border);
+  background-color: var(--mp-shell-surface);
+  color: var(--mp-lcd-text);
+}
+
+.soundTestFormatTag {
+  display: none;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border: 1px dashed var(--mp-shell-border);
+  color: var(--mp-accent);
+  white-space: nowrap;
+}
+
+.soundTestFormatTag:empty {
+  display: none !important;
+}
+
+.soundTestWinControls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.soundTestWinBtn {
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--mp-shell-surface);
+  color: var(--mp-text);
+  border: 1px solid var(--mp-shell-border);
+  box-shadow: inset 1px 1px 0 var(--mp-shell-bevel);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 110ms cubic-bezier(0.22, 1, 0.36, 1), background-color 140ms ease, border-color 140ms ease;
+}
+
+.soundTestWinBtn:hover {
+  background-color: var(--mp-shell-surface-hover);
+  border-color: var(--mp-accent);
+  color: var(--mp-lcd-text);
+}
+
+.soundTestWinBtn:active {
+  transform: translate(1px, 1px) scale(0.94);
+}
+
+.soundTestLcdPanel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  background-color: var(--mp-lcd-bg);
+  border: 2px solid var(--mp-lcd-border);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.65);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  transition: border-color 180ms ease;
+}
+
+.soundTestLcdPanel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    var(--mp-accent-soft) 50%,
+    transparent 100%
+  );
+  opacity: 0;
+  transform: translateY(-100%);
+  z-index: 2;
+}
+
+.soundTestLcdPanel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.03) 0px,
+    rgba(255, 255, 255, 0.03) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.7;
+}
+
+@keyframes mpLcdScanWipe {
+  0%   { opacity: 0.85; transform: translateY(-100%); }
+  65%  { opacity: 0.7; transform: translateY(45%); }
+  100% { opacity: 0; transform: translateY(105%); }
+}
+
+@keyframes mpLcdReadoutSnap {
+  0%   { opacity: 0.35; transform: translateX(-6px); }
+  65%  { opacity: 1; transform: translateX(2px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes mpPalettePulse {
+  0%   { opacity: 0; transform: translateY(0) scaleY(1); }
+  45%  { opacity: 0.45; transform: translateY(0) scaleY(1); }
+  100% { opacity: 0; transform: translateY(0) scaleY(1); }
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestLcdPanel.is-track-flash::before {
+  animation: mpLcdScanWipe 250ms var(--mp-step-4, steps(4, end)) forwards;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestLcdPanel.is-track-flash .soundTestLcdReadout {
+  animation: mpLcdReadoutSnap 200ms var(--mp-step-3, steps(3, end)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestLcdPanel.is-palette-pulse {
+  border-color: var(--mp-accent);
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestLcdPanel.is-palette-pulse::before {
+  animation: mpPalettePulse 225ms var(--mp-step-3, steps(3, end)) forwards;
+}
+
+@keyframes mpLedIgniteFlicker {
+  0%   { opacity: 0.3; transform: scale(0.85); }
+  30%  { opacity: 1; transform: scale(1.22); }
+  55%  { opacity: 0.45; transform: scale(0.95); }
+  80%  { opacity: 1; transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes mpLedHaloPulse {
+  0%, 100% {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.25);
+  }
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar:not(.hidden) .soundTestLed.is-led-igniting {
+  animation: mpLedIgniteFlicker 240ms var(--mp-step-5, steps(5, end)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-playing:not(.hidden) .soundTestLed::after {
+  animation: mpLedHaloPulse 1.4s ease-in-out infinite;
+}
+
+.soundTestArtWrap {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: 1px solid var(--mp-lcd-border);
+  background-color: #090a0c;
+  overflow: hidden;
+}
+
+@keyframes mpArtPopSettle {
+  0%   { opacity: 0.25; transform: scale(0.76) rotate(-5deg); }
+  55%  { opacity: 1; transform: scale(1.06) rotate(2deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestArtWrap.is-art-pop {
+  animation: mpArtPopSettle 270ms var(--mp-boing-ease, cubic-bezier(0.22, 1.38, 0.36, 1)) both;
+}
+
+.soundTestArtWrap.hidden {
+  display: none;
+}
+
+.soundTestArtImg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.soundTestLcdReadout {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 2px;
+}
+
+.soundTestTitleViewport {
+  width: 100%;
+  overflow: hidden;
   min-width: 0;
 }
 
 .soundTestTitle {
+  display: inline-block;
   font-weight: bold;
-  color: #29ff4a;
+  font-size: 12px;
+  color: var(--mp-lcd-text);
+  white-space: nowrap;
+}
+
+@keyframes mpTitleMarquee {
+  0%, 16% {
+    transform: translateX(0);
+  }
+  50%, 66% {
+    transform: translateX(calc(-1 * var(--mp-marquee-dist, 0px)));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+#app[data-animations-enabled="true"] .soundTestBar:not(.hidden):not(.is-minimized) .soundTestTitle.is-marquee {
+  animation: mpTitleMarquee 9s ease-in-out infinite;
 }
 
 .soundTestMeta {
   font-size: 10px;
-  color: #cccccc;
+  color: var(--mp-lcd-subtext);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.soundTestControls {
+.soundTestArtistLine {
+  display: none;
+  font-size: 10px;
+  color: var(--mp-accent);
+  opacity: 0.92;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.soundTestArtistLine:empty {
+  display: none !important;
+}
+
+.soundTestLcdStatus {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.soundTestTimeGroup {
+  display: inline-flex;
+  align-items: center;
   gap: 3px;
-  flex: 1;
-  max-width: 520px;
-  min-width: 180px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mp-lcd-subtext);
+}
+
+.soundTestRemainingTime {
+  display: none;
+  font-size: 10px;
+  color: var(--mp-lcd-subtext);
+  margin-left: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.soundTestRemainingTime:empty {
+  display: none !important;
+}
+
+.soundTestProgressPct {
+  display: none;
+  font-size: 9px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  color: var(--mp-accent);
+  border: 1px solid var(--mp-lcd-border);
+  padding: 0 4px;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.soundTestTimeSep {
+  opacity: 0.65;
+}
+
+.soundTestTime {
+  font-size: 10px;
+  color: var(--mp-lcd-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.soundTestSeekRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.soundTestSquigglyCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+}
+
+.soundTestSquigglyCanvas:focus-visible {
+  outline: 1px dotted var(--mp-accent);
+}
+
+.soundTestSquigglyCanvas.is-indeterminate {
+  cursor: default;
+}
+
+.soundTestSeekSlider {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  margin: 0;
+}
+
+.soundTestDeckControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .soundTestTransport {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.soundTestSeekRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-
-.soundTestTime {
-  font-size: 10px;
-  color: #b3b3b3;
-  min-width: 32px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.soundTestSeekSlider,
-.soundTestVolumeSlider {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 4px;
-  border-radius: 999px;
-  background: #4d4d4d;
-  outline: none;
-  cursor: pointer;
-}
-
-.soundTestSeekSlider {
-  flex: 1;
-  min-width: 0;
-}
-
-.soundTestVolumeSlider {
-  width: 96px;
-}
-
-.soundTestSeekSlider::-webkit-slider-thumb,
-.soundTestVolumeSlider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #29ff4a;
-  border: none;
-  cursor: pointer;
-}
-
-.soundTestSeekSlider::-moz-range-thumb,
-.soundTestVolumeSlider::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #29ff4a;
-  border: none;
-  cursor: pointer;
-}
-
-.soundTestRight {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  gap: 5px;
   flex-shrink: 0;
+}
+
+.soundTestBtn {
+  background-color: var(--mp-shell-surface);
+  color: var(--mp-text);
+  border: 1px solid var(--mp-shell-border);
+  box-shadow: inset 1px 1px 0 var(--mp-shell-bevel);
+  padding: 4px 10px;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.soundTestBtn:hover {
+  background-color: var(--mp-shell-surface-hover);
+  border-color: var(--mp-accent);
+}
+
+.soundTestBtn:active {
+  transform: translate(1px, 1px);
+}
+
+.soundTestPlayBtn {
+  background-color: var(--mp-accent);
+  color: var(--mp-accent-on);
+  border-color: var(--mp-accent);
+  min-width: 36px;
+}
+
+.soundTestPlayBtn:hover {
+  background-color: var(--mp-accent);
+  filter: brightness(1.08);
 }
 
 .soundTestVolumeGroup {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
 }
 
 .soundTestMuteBtn {
-  background: transparent;
-  color: #e0e0e0;
-  border: none;
-  padding: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border-radius: 4px;
+  padding: 3px 5px;
+  min-height: 24px;
 }
 
-.soundTestMuteBtn:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
+.soundTestVolumeSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  width: 74px;
+  min-width: 48px;
+  border-radius: 2px;
+  background: var(--mp-track-inactive);
+  outline: none;
+  cursor: pointer;
+}
+
+.soundTestVolumeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 12px;
+  background: var(--mp-accent);
+  border: 1px solid var(--mp-shell-bg);
+  cursor: pointer;
+}
+
+.soundTestVolumeSlider::-moz-range-thumb {
+  width: 10px;
+  height: 12px;
+  border-radius: 0;
+  background: var(--mp-accent);
+  border: 1px solid var(--mp-shell-bg);
+  cursor: pointer;
 }
 
 .soundTestVolPct {
   font-size: 10px;
-  color: #b3b3b3;
-  min-width: 34px;
+  color: var(--mp-text-muted);
+  min-width: 32px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  display: inline-block;
 }
 
-.soundTestControls audio {
+@keyframes mpPlayBtnMorphCel {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.16, 0.86); }
+  65%  { transform: scale(0.94, 1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes mpPlayIconSwap {
+  0%   { opacity: 0.35; transform: scale(0.6) rotate(-14deg); }
+  55%  { opacity: 1; transform: scale(1.18) rotate(5deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+@keyframes mpStopBtnClunk {
+  0%   { transform: translate(0, 0) scale(1); }
+  35%  { transform: translate(1px, 2px) scale(0.9, 0.92); }
+  75%  { transform: translate(-0.5px, -0.5px) scale(1.04, 1.03); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes mpDeckMicroRecoil {
+  0%   { transform: translate(0, 0) scale(1); }
+  40%  { transform: translate(0, 2px) scale(0.992, 1.008); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes mpMuteBtnSnap {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.12, 0.9) rotate(-4deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes mpMuteSlashDraw {
+  0%   { stroke-dashoffset: 10; opacity: 0.3; }
+  60%  { stroke-dashoffset: 2; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes mpVolWavePop {
+  0%   { opacity: 0.2; transform: scale(0.55); }
+  65%  { opacity: 1; transform: scale(1.18); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes mpVolThumbStepNudge {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.22, 0.88); }
+  100% { transform: scale(1.08, 1.04); }
+}
+
+@keyframes mpVolPctTick {
+  0%   { transform: translateY(-2px) scale(1.1); color: var(--mp-accent); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestPlayBtn.is-state-kick,
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestMiniPlayBtn.is-state-kick {
+  animation: mpPlayBtnMorphCel 180ms var(--mp-boing-ease, cubic-bezier(0.22, 1.38, 0.36, 1)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestPlayBtn.is-state-kick .soundTestPlayGlyph,
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestMiniPlayBtn.is-state-kick .soundTestPlayGlyph {
+  display: inline-block;
+  animation: mpPlayIconSwap 170ms var(--mp-step-3, steps(3, end)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] #sound-test-stop-btn.is-clunked {
+  animation: mpStopBtnClunk 160ms var(--mp-step-3, steps(3, end)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-deck-recoil {
+  animation: mpDeckMicroRecoil 185ms var(--mp-boing-ease, cubic-bezier(0.22, 1.38, 0.36, 1)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] #sound-test-mute-btn.is-mute-engage {
+  animation: mpMuteBtnSnap 165ms var(--mp-step-3, steps(3, end)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] #sound-test-mute-btn.is-mute-engage .vol-mute-x {
+  stroke-dasharray: 10;
+  animation: mpMuteSlashDraw 145ms var(--mp-step-3, steps(3, end)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] #sound-test-mute-btn.is-mute-engage .vol-mute-x + .vol-mute-x {
+  animation-delay: 35ms;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] #sound-test-mute-btn.is-wave-pop .vol-wave-low,
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] #sound-test-mute-btn.is-wave-pop .vol-wave-high,
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] #sound-test-mute-btn.is-wave-up .vol-wave-high {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: mpVolWavePop 160ms var(--mp-pop-ease, cubic-bezier(0.2, 1.42, 0.38, 1)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestVolumeSlider.is-scrubbing::-webkit-slider-thumb {
+  animation: mpVolThumbStepNudge 115ms var(--mp-step-3, steps(3, end)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestVolumeSlider.is-scrubbing::-moz-range-thumb {
+  animation: mpVolThumbStepNudge 115ms var(--mp-step-3, steps(3, end)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestVolPct.is-pct-tick {
+  animation: mpVolPctTick 120ms var(--mp-step-2, steps(2, end)) both;
+}
+
+/* Minimized Compact Pocket Strip */
+.soundTestMiniStrip {
+  display: none;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.soundTestBar.is-minimized {
+  width: 268px;
+  height: auto;
+  min-height: 0;
+  padding: 6px 8px;
+  gap: 0;
+}
+
+/* Multi-Size Adaptive Deck Layouts (micro / compact / standard / studio) */
+.soundTestBar[data-size-tier="micro"] {
+  gap: 3px;
+  padding: 4px 7px 4px 7px;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestChassisHeader {
+  padding-bottom: 2px;
+  gap: 4px;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestBrandLabel,
+.soundTestBar[data-size-tier="micro"] .soundTestModeBadge,
+.soundTestBar[data-size-tier="micro"] .soundTestArtWrap,
+.soundTestBar[data-size-tier="micro"] .soundTestMeta,
+.soundTestBar[data-size-tier="micro"] .soundTestVolumeSlider,
+.soundTestBar[data-size-tier="micro"] .soundTestVolPct {
   display: none;
 }
 
-.soundTestBtn,
-.soundTestCloseBtn {
-  background: #333333;
-  color: #ffffff;
-  border: 1px solid #666666;
-  border-radius: 3px;
+.soundTestBar[data-size-tier="micro"] .soundTestWinBtn {
+  width: 17px;
+  height: 15px;
+  font-size: 10px;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestLcdPanel {
+  padding: 3px 5px;
+  border-width: 1px;
+  gap: 4px;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestLcdReadout {
+  gap: 1px;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestTitle {
+  font-size: 10.5px;
+  line-height: 1.15;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestLcdStatus {
+  margin-top: 0;
+  gap: 4px;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestEq {
+  height: 10px;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestTimeGroup,
+.soundTestBar[data-size-tier="micro"] .soundTestTime {
+  font-size: 9px;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestSeekRow {
+  height: 14px;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestBtn {
+  min-height: 18px;
+  padding: 1px 6px;
+  font-size: 10px;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestPlayBtn {
+  min-width: 28px;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestMuteBtn {
+  min-height: 18px;
+  padding: 1px 5px;
+}
+
+.soundTestBar[data-size-tier="micro"] .soundTestVolumeGroup {
+  flex: 0 0 auto;
+}
+
+.soundTestBar[data-size-tier="compact"] {
+  gap: 5px;
+  padding: 6px 8px 6px 8px;
+}
+
+.soundTestBar[data-size-tier="compact"] .soundTestChassisHeader {
+  padding-bottom: 3px;
+}
+
+.soundTestBar[data-size-tier="compact"] .soundTestWinBtn {
+  width: 19px;
+  height: 17px;
+  font-size: 10px;
+}
+
+.soundTestBar[data-size-tier="compact"] .soundTestArtWrap,
+.soundTestBar[data-size-tier="compact"] .soundTestVolPct {
+  display: none;
+}
+
+.soundTestBar[data-size-tier="compact"] .soundTestLcdPanel {
+  padding: 5px 6px;
+}
+
+.soundTestBar[data-size-tier="compact"] .soundTestTitle {
+  font-size: 11px;
+}
+
+.soundTestBar[data-size-tier="compact"] .soundTestMeta {
+  font-size: 9.5px;
+}
+
+.soundTestBar[data-size-tier="compact"] .soundTestSeekRow {
+  height: 18px;
+}
+
+.soundTestBar[data-size-tier="compact"] .soundTestBtn {
+  min-height: 22px;
   padding: 2px 8px;
+  font-size: 10.5px;
+}
+
+.soundTestBar[data-size-tier="compact"] .soundTestPlayBtn {
+  min-width: 32px;
+}
+
+.soundTestBar[data-size-tier="compact"] .soundTestVolumeSlider {
+  width: 58px;
+  min-width: 40px;
+}
+
+.soundTestBar[data-size-tier="studio"] {
+  gap: 8px;
+  padding: 9px 12px 11px 12px;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestFormatTag:not(:empty) {
+  display: inline-block;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestLcdPanel {
+  padding: 9px 10px;
+  gap: 11px;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestArtWrap {
+  width: 66px;
+  height: 66px;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestLcdReadout {
+  gap: 3px;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestTitle {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestMeta {
+  font-size: 10.5px;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestArtistLine:not(:empty) {
+  display: block;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestRemainingTime:not(:empty),
+.soundTestBar[data-size-tier="studio"] .soundTestProgressPct {
+  display: inline-block;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestEq {
+  height: 16px;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestSeekRow {
+  height: 26px;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestBtn {
+  min-height: 28px;
+  padding: 4px 12px;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestPlayBtn {
+  min-width: 46px;
+}
+
+.soundTestBar[data-size-tier="studio"] .soundTestVolumeSlider {
+  width: 110px;
+}
+
+.soundTestBar.is-minimized .soundTestChassisHeader,
+.soundTestBar.is-minimized .soundTestLcdPanel,
+.soundTestBar.is-minimized .soundTestSeekRow,
+.soundTestBar.is-minimized .soundTestDeckControls {
+  display: none;
+}
+
+.soundTestBar.is-minimized .soundTestMiniStrip {
+  display: flex;
+}
+
+.soundTestMiniTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--mp-lcd-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.soundTestMiniActions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.soundTestMiniPlayBtn {
+  background-color: var(--mp-accent);
+  color: var(--mp-accent-on);
+  border-color: var(--mp-accent);
+}
+
+.soundTestReopenBtn {
+  --mp-shell-bg: #1e2124;
+  --mp-shell-surface: #2b2f34;
+  --mp-shell-border: #687078;
+  --mp-shell-shadow: rgba(0, 0, 0, 0.55);
+  --mp-lcd-text: #eef1f5;
+  --mp-accent: #e0e6ed;
+  --mp-origin: bottom right;
+  --mp-dir-x: 1;
+  --mp-dir-y: 1;
+  --mp-anchor-x: 10px;
+  --mp-anchor-y: 10px;
+  --mp-pill-tug-x: 0px;
+  --mp-pill-tug-y: 0px;
+
+  position: fixed;
+  bottom: 14px;
+  right: 14px;
+  left: auto;
+  z-index: 199;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--mp-shell-bg);
+  color: var(--mp-accent);
+  border: 2px solid var(--mp-shell-border);
+  box-shadow: 3px 3px 0 var(--mp-shell-shadow);
+  padding: 6px 10px;
+  font-family: var(--font-family-ui, "Courier Prime", "Courier New", monospace);
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.04em;
   cursor: pointer;
+  transform-origin: var(--mp-origin);
+  transform: translate(var(--mp-pill-tug-x), var(--mp-pill-tug-y));
+  transition: transform 140ms var(--mp-boing-ease, cubic-bezier(0.22, 1.38, 0.36, 1)),
+              background-color 140ms ease,
+              border-color 140ms ease;
+}
+
+.soundTestReopenBtn[data-corner="bottom-left"],
+.soundTestReopenBtn[data-corner="left"] {
+  --mp-origin: bottom left;
+  --mp-dir-x: -1;
+  --mp-dir-y: 1;
+  --mp-anchor-x: -10px;
+  --mp-anchor-y: 10px;
+  left: 14px;
+  right: auto;
+  bottom: 14px;
+  top: auto;
+}
+
+.soundTestReopenBtn[data-corner="top-right"] {
+  --mp-origin: top right;
+  --mp-dir-x: 1;
+  --mp-dir-y: -1;
+  --mp-anchor-x: 10px;
+  --mp-anchor-y: -10px;
+  top: var(--mp-top-safe, 84px);
+  bottom: auto;
+  right: 14px;
+  left: auto;
+}
+
+.soundTestReopenBtn[data-corner="top-left"] {
+  --mp-origin: top left;
+  --mp-dir-x: -1;
+  --mp-dir-y: -1;
+  --mp-anchor-x: -10px;
+  --mp-anchor-y: -10px;
+  top: var(--mp-top-safe, 84px);
+  bottom: auto;
+  left: 14px;
+  right: auto;
+}
+
+.soundTestReopenBtn:hover,
+.soundTestReopenBtn:focus-visible {
+  background-color: var(--mp-shell-surface);
+  border-color: var(--mp-accent);
+}
+
+.soundTestReopenBtn:active {
+  transform: translate(var(--mp-pill-tug-x), calc(var(--mp-pill-tug-y) + 1px)) scale(0.95);
+}
+
+@keyframes mpReopenPillPopIn {
+  0% {
+    opacity: 0;
+    transform: translate(calc(var(--mp-dir-x, 1) * 16px), calc(var(--mp-dir-y, 1) * 16px)) scale(0.72);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(calc(var(--mp-dir-x, 1) * -2px), calc(var(--mp-dir-y, 1) * -2px)) scale(1.06, 0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(var(--mp-pill-tug-x, 0px), var(--mp-pill-tug-y, 0px)) scale(1);
+  }
+}
+
+@keyframes mpReopenPillZipOut {
+  0% {
+    opacity: 1;
+    transform: translate(var(--mp-pill-tug-x, 0px), var(--mp-pill-tug-y, 0px)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--mp-dir-x, 1) * 14px), calc(var(--mp-dir-y, 1) * 14px)) scale(0.75);
+  }
+}
+
+@keyframes mpReopenNoteHop {
+  0%   { transform: translateY(0) rotate(0deg); }
+  40%  { transform: translateY(-3px) rotate(-10deg) scale(1.1); }
+  75%  { transform: translateY(1px) rotate(5deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+.soundTestReopenBtn.reopen-open {
+  animation: mpReopenPillPopIn 210ms var(--mp-pop-ease, cubic-bezier(0.2, 1.42, 0.38, 1)) both;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestReopenBtn.reopen-open svg,
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestReopenBtn:hover svg,
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestReopenBtn:focus-visible svg {
+  animation: mpReopenNoteHop 240ms var(--mp-step-4, steps(4, end)) both;
+}
+
+.soundTestReopenBtn.reopen-closing {
+  pointer-events: none;
+  animation: mpReopenPillZipOut 140ms var(--mp-zip-ease, cubic-bezier(0.55, 0.04, 0.88, 0.36)) forwards;
+}
+
+.soundTestReopenBtn.hidden {
+  display: none;
 }
 
 /* --------------------------------------------------------------------------
@@ -3592,27 +5165,45 @@ nav.navBanner,
   }
 
   .soundTestBar {
+    width: min(var(--mp-player-w, 312px), calc(100vw - 20px)) !important;
+    height: min(var(--mp-player-h, 160px), calc(100vh - 96px)) !important;
+    box-sizing: border-box !important;
+  }
+
+  .soundTestBar[data-corner="bottom-right"]:not(.is-dragging):not(.is-snapping),
+  .soundTestBar[data-corner="right"]:not(.is-dragging):not(.is-snapping) {
+    bottom: 10px !important;
+    right: 10px !important;
+    left: auto !important;
+    top: auto !important;
+  }
+
+  .soundTestBar[data-corner="bottom-left"]:not(.is-dragging):not(.is-snapping),
+  .soundTestBar[data-corner="left"]:not(.is-dragging):not(.is-snapping) {
+    bottom: 10px !important;
+    left: 10px !important;
+    right: auto !important;
+    top: auto !important;
+  }
+
+  .soundTestBar[data-corner="top-right"]:not(.is-dragging):not(.is-snapping) {
+    top: var(--mp-top-safe, 72px) !important;
+    right: 10px !important;
+    left: auto !important;
+    bottom: auto !important;
+  }
+
+  .soundTestBar[data-corner="top-left"]:not(.is-dragging):not(.is-snapping) {
+    top: var(--mp-top-safe, 72px) !important;
+    left: 10px !important;
+    right: auto !important;
+    bottom: auto !important;
+  }
+
+  .soundTestBar.is-minimized {
+    width: min(268px, calc(100vw - 20px)) !important;
     height: auto !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    padding: 8px 10px !important;
-    gap: 6px !important;
-    box-sizing: border-box !important;
-  }
-
-  .soundTestInfo {
-    min-width: 0 !important;
-    width: 100% !important;
-    justify-content: center !important;
-    text-align: center !important;
-    box-sizing: border-box !important;
-  }
-
-  .soundTestControls {
-    width: 100% !important;
-    max-width: 100% !important;
-    justify-content: center !important;
-    box-sizing: border-box !important;
+    min-height: 0 !important;
   }
 
   /* ==========================================================================
@@ -4145,12 +5736,40 @@ nav.navBanner,
 }
 
 .soundTestBar.soundbar-open {
-  animation: soundBarCartoonIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: mpBarWebPopIn 230ms var(--mp-boing-ease, cubic-bezier(0.22, 1.38, 0.36, 1)) both;
 }
 
 .soundTestBar.soundbar-closing {
   pointer-events: none;
-  animation: soundBarCartoonOut 150ms ease-in forwards;
+  animation: mpBarWebZipOut 185ms var(--mp-zip-ease, cubic-bezier(0.55, 0.04, 0.88, 0.36)) forwards;
+}
+
+.soundTestBar.is-minimizing {
+  animation: mpBarMinimizeSquish 215ms var(--mp-step-4, steps(4, end)) both;
+}
+
+.soundTestBar.is-minimized.is-minimizing .soundTestMiniStrip {
+  animation: mpMiniStripCelIn 175ms var(--mp-pop-ease, cubic-bezier(0.2, 1.42, 0.38, 1)) both;
+}
+
+.soundTestBar.is-expanding {
+  animation: mpBarExpandUnfold 235ms var(--mp-boing-ease, cubic-bezier(0.22, 1.38, 0.36, 1)) both;
+}
+
+.soundTestBar.is-expanding .soundTestChassisHeader {
+  animation: mpExpandModulePop 140ms var(--mp-pop-ease, cubic-bezier(0.2, 1.42, 0.38, 1)) 0ms both;
+}
+
+.soundTestBar.is-expanding .soundTestLcdPanel {
+  animation: mpExpandModulePop 155ms var(--mp-pop-ease, cubic-bezier(0.2, 1.42, 0.38, 1)) 25ms both;
+}
+
+.soundTestBar.is-expanding .soundTestSeekRow {
+  animation: mpExpandModulePop 155ms var(--mp-pop-ease, cubic-bezier(0.2, 1.42, 0.38, 1)) 50ms both;
+}
+
+.soundTestBar.is-expanding .soundTestDeckControls {
+  animation: mpExpandModulePop 155ms var(--mp-pop-ease, cubic-bezier(0.2, 1.42, 0.38, 1)) 75ms both;
 }
 
 .soundTestEq {
@@ -4158,37 +5777,49 @@ nav.navBanner,
   flex: 0 0 auto;
   align-items: flex-end;
   gap: 2px;
-  height: 16px;
-  margin-right: 4px;
-  color: #29ff4a;
+  height: 14px;
+  color: var(--mp-accent, #e0e6ed);
   align-self: center;
 }
 
 .soundTestEq span {
   display: block;
   width: 3px;
-  height: 5px;
+  height: 100%;
   background: currentColor;
   opacity: 0.45;
+  transform: scaleY(0.28);
   transform-origin: bottom center;
 }
 
-#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-playing .soundTestEq span {
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-playing:not(.hidden) .soundTestEq span {
   opacity: 1;
-  background: #29ff4a;
-  animation: soundEqDance 360ms ease-in-out infinite alternate;
+  background: var(--mp-accent, #e0e6ed);
+  animation: mpEqCelBar 360ms var(--mp-step-3, steps(3, end)) infinite alternate;
 }
 
-#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-playing .soundTestEq span:nth-child(2) {
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-playing:not(.hidden) .soundTestEq span:nth-child(2) {
   animation-delay: 83ms;
 }
 
-#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-playing .soundTestEq span:nth-child(3) {
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-playing:not(.hidden) .soundTestEq span:nth-child(3) {
   animation-delay: 167ms;
 }
 
-#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-playing .soundTestEq span:nth-child(4) {
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-playing:not(.hidden) .soundTestEq span:nth-child(4) {
   animation-delay: 42ms;
+}
+
+#app[data-animations-enabled="true"][data-anim-uimicro="true"] .soundTestBar.is-eq-decaying:not(.is-playing):not(.hidden) .soundTestEq span {
+  animation: mpEqPauseDecay 240ms var(--mp-step-3, steps(3, end)) forwards;
+}
+
+.soundTestBar.hidden .soundTestEq span,
+.soundTestBar.hidden .soundTestLed::after,
+.soundTestBar.hidden .soundTestTitle.is-marquee,
+.soundTestBar.is-minimized .soundTestLcdPanel .soundTestEq span,
+.soundTestBar.is-minimized .soundTestTitle.is-marquee {
+  animation: none !important;
 }
 
 .anim-collapsible-open {
@@ -4357,34 +5988,121 @@ nav.navBanner,
   }
 }
 
-@keyframes soundBarCartoonIn {
+@keyframes mpBarWebPopIn {
   0% {
     opacity: 0;
-    transform: translateY(100%);
+    transform: translate(calc(var(--mp-dir-x, 1) * 14px), calc(var(--mp-dir-y, 1) * 14px)) scale(0.84);
+  }
+  52% {
+    opacity: 1;
+    transform: translate(calc(var(--mp-dir-x, 1) * -2px), calc(var(--mp-dir-y, 1) * -2px)) scale(1.03, 0.975);
+  }
+  78% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.99, 1.01);
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(0, 0) scale(1, 1);
   }
 }
 
-@keyframes soundBarCartoonOut {
+@keyframes mpBarWebZipOut {
   0% {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(0, 0) scale(1, 1);
+  }
+  28% {
+    opacity: 1;
+    transform: translate(calc(var(--mp-dir-x, 1) * -1px), calc(var(--mp-dir-y, 1) * -1px)) scale(1.02, 0.985);
   }
   100% {
     opacity: 0;
-    transform: translateY(100%);
+    transform: translate(calc(var(--mp-dir-x, 1) * 18px), calc(var(--mp-dir-y, 1) * 18px)) scale(0.76);
   }
 }
 
-@keyframes soundEqDance {
+@keyframes mpBarMinimizeSquish {
   0% {
-    height: 3px;
+    opacity: 0.92;
+    transform: translate(0, calc(var(--mp-dir-y, 1) * -6px)) scale(1.03, 1.12);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(calc(var(--mp-dir-x, 1) * 2px), calc(var(--mp-dir-y, 1) * 2px)) scale(1.02, 0.9);
   }
   100% {
-    height: 14px;
+    opacity: 1;
+    transform: translate(0, 0) scale(1, 1);
+  }
+}
+
+@keyframes mpMiniStripCelIn {
+  0% {
+    opacity: 0;
+    transform: translateX(calc(var(--mp-dir-x, 1) * 8px)) scale(0.92);
+  }
+  65% {
+    opacity: 1;
+    transform: translateX(0) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes mpBarExpandUnfold {
+  0% {
+    opacity: 0.85;
+    transform: translate(0, calc(var(--mp-dir-y, 1) * 8px)) scale(0.95, 0.78);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(0, calc(var(--mp-dir-y, 1) * -2px)) scale(1.015, 1.035);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1, 1);
+  }
+}
+
+@keyframes mpExpandModulePop {
+  0% {
+    opacity: 0;
+    transform: translateY(calc(var(--mp-dir-y, 1) * 5px)) scale(0.96);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(0) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes mpEqCelBar {
+  0% {
+    transform: scaleY(0.22);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes mpEqPauseDecay {
+  0% {
+    opacity: 0.9;
+    transform: scaleY(0.75);
+  }
+  60% {
+    opacity: 0.6;
+    transform: scaleY(0.38);
+  }
+  100% {
+    opacity: 0.45;
+    transform: scaleY(0.28);
   }
 }
 
@@ -4924,6 +6642,73 @@ nav.navBanner,
 #app[data-animations-enabled="false"] *::after {
   animation-duration: 0.001ms !important;
   transition-duration: 0.001ms !important;
+}
+
+#app[data-animations-enabled="false"] .soundTestBar,
+#app[data-animations-enabled="false"] .soundTestBar *,
+#app[data-animations-enabled="false"] .soundTestBar *::before,
+#app[data-animations-enabled="false"] .soundTestBar *::after,
+#app[data-animations-enabled="false"] .soundTestSnapOverlay *,
+#app[data-animations-enabled="false"] .soundTestReopenBtn,
+#app[data-animations-enabled="false"] .soundTestReopenBtn * {
+  animation: none !important;
+  transition: none !important;
+}
+
+#app[data-anim-uimicro="false"] .soundTestSnapOverlay .soundTestDockRect,
+#app[data-anim-uimicro="false"] .soundTestSnapOverlay .soundTestTetherMain,
+#app[data-anim-uimicro="false"] .soundTestSnapOverlay .soundTestTetherSub,
+#app[data-anim-uimicro="false"] .soundTestSnapOverlay .soundTestTetherCross,
+#app[data-anim-uimicro="false"] .soundTestSnapOverlay .soundTestTetherNode,
+#app[data-anim-uimicro="false"] .soundTestDockTarget,
+#app[data-anim-uimicro="false"] .soundTestDockCorner,
+#app[data-anim-uimicro="false"] .soundTestCornerRipple,
+#app[data-anim-uimicro="false"] .soundTestCornerRipple::after,
+#app[data-anim-uimicro="false"] .soundTestCornerAnchorWeb,
+#app[data-anim-uimicro="false"] .soundTestAnchorFilament,
+#app[data-anim-uimicro="false"] .soundTestAnchorBridge,
+#app[data-anim-uimicro="false"] .soundTestResizeGrip::before,
+#app[data-anim-uimicro="false"] .soundTestBar.is-snapped,
+#app[data-anim-uimicro="false"] .soundTestBar.is-resize-settling,
+#app[data-anim-uimicro="false"] .soundTestBar.is-tier-transitioning,
+#app[data-anim-uimicro="false"] .soundTestBar.is-tier-transitioning *,
+#app[data-anim-uimicro="false"] .soundTestBar.is-deck-recoil,
+#app[data-anim-uimicro="false"] .soundTestBar.is-eq-decaying .soundTestEq span,
+#app[data-anim-uimicro="false"] .soundTestEq span,
+#app[data-anim-uimicro="false"] .soundTestLed,
+#app[data-anim-uimicro="false"] .soundTestLed::after,
+#app[data-anim-uimicro="false"] .soundTestLcdPanel::before,
+#app[data-anim-uimicro="false"] .soundTestLcdReadout,
+#app[data-anim-uimicro="false"] .soundTestArtWrap,
+#app[data-anim-uimicro="false"] .soundTestPlayBtn,
+#app[data-anim-uimicro="false"] .soundTestMiniPlayBtn,
+#app[data-anim-uimicro="false"] .soundTestPlayGlyph,
+#app[data-anim-uimicro="false"] #sound-test-stop-btn,
+#app[data-anim-uimicro="false"] #sound-test-mute-btn,
+#app[data-anim-uimicro="false"] #sound-test-mute-btn *,
+#app[data-anim-uimicro="false"] .soundTestVolPct,
+#app[data-anim-uimicro="false"] .soundTestReopenBtn svg {
+  animation: none !important;
+}
+
+#app[data-anim-uimicro="false"] .soundTestBar.is-resizing {
+  transform: none !important;
+}
+
+#app[data-anim-uimicro="false"] .soundTestReopenBtn {
+  transform: none !important;
+  transition: background-color 140ms ease, border-color 140ms ease !important;
+}
+
+#app[data-anim-uimicro="false"][data-anim-menus="false"] .soundTestBar,
+#app[data-anim-uimicro="false"][data-anim-menus="false"] .soundTestBar *,
+#app[data-anim-uimicro="false"][data-anim-menus="false"] .soundTestBar *::before,
+#app[data-anim-uimicro="false"][data-anim-menus="false"] .soundTestBar *::after,
+#app[data-anim-uimicro="false"][data-anim-menus="false"] .soundTestSnapOverlay *,
+#app[data-anim-uimicro="false"][data-anim-menus="false"] .soundTestReopenBtn,
+#app[data-anim-uimicro="false"][data-anim-menus="false"] .soundTestReopenBtn * {
+  animation: none !important;
+  transition: none !important;
 }
 
 /* ==========================================================================
@@ -6562,8 +8347,21 @@ body.rrwr-hide-expand-btn .mediaExpandBtn {
   .vcLayoutOption,
   .vcSegBtn,
   .vcModalBackdrop,
-  .vcModalCard {
+  .vcModalCard,
+  .soundTestBar,
+  .soundTestBar *,
+  .soundTestBar *::before,
+  .soundTestBar *::after,
+  .soundTestSnapOverlay,
+  .soundTestSnapOverlay *,
+  .soundTestReopenBtn,
+  .soundTestReopenBtn * {
     transition: none !important;
     animation: none !important;
+  }
+
+  .soundTestBar.is-resizing,
+  .soundTestReopenBtn {
+    transform: none !important;
   }
 }
