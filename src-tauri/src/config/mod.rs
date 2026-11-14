@@ -184,6 +184,252 @@ impl Default for AnimationCategories {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct KeyBinding {
+    pub key: String,
+    pub code: String,
+    #[serde(default, alias = "key_code")]
+    pub key_code: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionButtonBinding {
+    pub id: String,
+    pub label: String,
+    pub key: String,
+    pub code: String,
+    #[serde(default, alias = "key_code")]
+    pub key_code: u32,
+    #[serde(default)]
+    pub x: Option<f64>,
+    #[serde(default)]
+    pub y: Option<f64>,
+}
+
+fn default_dir_up() -> KeyBinding {
+    KeyBinding {
+        key: "ArrowUp".to_string(),
+        code: "ArrowUp".to_string(),
+        key_code: 38,
+    }
+}
+
+fn default_dir_down() -> KeyBinding {
+    KeyBinding {
+        key: "ArrowDown".to_string(),
+        code: "ArrowDown".to_string(),
+        key_code: 40,
+    }
+}
+
+fn default_dir_left() -> KeyBinding {
+    KeyBinding {
+        key: "ArrowLeft".to_string(),
+        code: "ArrowLeft".to_string(),
+        key_code: 37,
+    }
+}
+
+fn default_dir_right() -> KeyBinding {
+    KeyBinding {
+        key: "ArrowRight".to_string(),
+        code: "ArrowRight".to_string(),
+        key_code: 39,
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirectionBindings {
+    #[serde(default = "default_dir_up")]
+    pub up: KeyBinding,
+    #[serde(default = "default_dir_down")]
+    pub down: KeyBinding,
+    #[serde(default = "default_dir_left")]
+    pub left: KeyBinding,
+    #[serde(default = "default_dir_right")]
+    pub right: KeyBinding,
+}
+
+impl Default for DirectionBindings {
+    fn default() -> Self {
+        Self {
+            up: default_dir_up(),
+            down: default_dir_down(),
+            left: default_dir_left(),
+            right: default_dir_right(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControllerClusterPosition {
+    pub x: f64,
+    pub y: f64,
+}
+
+fn default_dpad_position() -> ControllerClusterPosition {
+    ControllerClusterPosition { x: 4.0, y: 62.0 }
+}
+
+fn default_actions_position() -> ControllerClusterPosition {
+    ControllerClusterPosition { x: 72.0, y: 60.0 }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControllerPositions {
+    #[serde(default = "default_dpad_position")]
+    pub dpad: ControllerClusterPosition,
+    #[serde(default = "default_actions_position")]
+    pub actions: ControllerClusterPosition,
+}
+
+impl Default for ControllerPositions {
+    fn default() -> Self {
+        Self {
+            dpad: default_dpad_position(),
+            actions: default_actions_position(),
+        }
+    }
+}
+
+fn default_direction_preset() -> String {
+    "arrows".to_string()
+}
+
+fn default_action_buttons() -> Vec<ActionButtonBinding> {
+    vec![
+        ActionButtonBinding {
+            id: "act-space".to_string(),
+            label: "SPACE".to_string(),
+            key: " ".to_string(),
+            code: "Space".to_string(),
+            key_code: 32,
+            x: None,
+            y: None,
+        },
+        ActionButtonBinding {
+            id: "act-enter".to_string(),
+            label: "ENTER".to_string(),
+            key: "Enter".to_string(),
+            code: "Enter".to_string(),
+            key_code: 13,
+            x: None,
+            y: None,
+        },
+        ActionButtonBinding {
+            id: "act-z".to_string(),
+            label: "Z".to_string(),
+            key: "z".to_string(),
+            code: "KeyZ".to_string(),
+            key_code: 90,
+            x: None,
+            y: None,
+        },
+        ActionButtonBinding {
+            id: "act-x".to_string(),
+            label: "X".to_string(),
+            key: "x".to_string(),
+            code: "KeyX".to_string(),
+            key_code: 88,
+            x: None,
+            y: None,
+        },
+        ActionButtonBinding {
+            id: "act-shift".to_string(),
+            label: "SHIFT".to_string(),
+            key: "Shift".to_string(),
+            code: "ShiftLeft".to_string(),
+            key_code: 16,
+            x: None,
+            y: None,
+        },
+        ActionButtonBinding {
+            id: "act-m".to_string(),
+            label: "M".to_string(),
+            key: "m".to_string(),
+            code: "KeyM".to_string(),
+            key_code: 77,
+            x: None,
+            y: None,
+        },
+    ]
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ControllerBindings {
+    #[serde(default = "default_direction_preset", alias = "direction_preset")]
+    pub direction_preset: String,
+    #[serde(default)]
+    pub directions: DirectionBindings,
+    #[serde(default = "default_action_buttons")]
+    pub actions: Vec<ActionButtonBinding>,
+}
+
+impl Default for ControllerBindings {
+    fn default() -> Self {
+        Self {
+            direction_preset: default_direction_preset(),
+            directions: DirectionBindings::default(),
+            actions: default_action_buttons(),
+        }
+    }
+}
+
+fn default_vc_mode() -> String {
+    "auto".to_string()
+}
+
+fn default_vc_layout() -> String {
+    "joystick-round".to_string()
+}
+
+fn default_vc_opacity() -> f64 {
+    0.78
+}
+
+fn default_vc_scale() -> f64 {
+    1.0
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VirtualControllerSettings {
+    #[serde(default = "default_vc_mode")]
+    pub mode: String,
+    #[serde(default = "default_vc_layout")]
+    pub layout: String,
+    #[serde(default = "default_vc_opacity")]
+    pub opacity: f64,
+    #[serde(default = "default_vc_scale")]
+    pub scale: f64,
+    #[serde(default)]
+    pub positions: ControllerPositions,
+    #[serde(default)]
+    pub bindings: ControllerBindings,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+impl Default for VirtualControllerSettings {
+    fn default() -> Self {
+        Self {
+            mode: default_vc_mode(),
+            layout: default_vc_layout(),
+            opacity: default_vc_opacity(),
+            scale: default_vc_scale(),
+            positions: ControllerPositions::default(),
+            bindings: ControllerBindings::default(),
+            extra: serde_json::Map::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     #[serde(default, alias = "reading_progress")]
     pub reading_progress: ReadingProgressSettings,
@@ -247,6 +493,14 @@ pub struct AppSettings {
     pub open_logs: bool,
     #[serde(default = "default_true", alias = "hq_audio")]
     pub hq_audio: bool,
+    #[serde(default = "default_true", alias = "media_expand_button")]
+    pub media_expand_button: bool,
+    #[serde(default = "default_true", alias = "panel_fill_width")]
+    pub panel_fill_width: bool,
+    #[serde(default = "default_true", alias = "media_viewer_gestures")]
+    pub media_viewer_gestures: bool,
+    #[serde(default = "default_true", alias = "swf_auto_landscape")]
+    pub swf_auto_landscape: bool,
     #[serde(
         default = "default_master_volume",
         deserialize_with = "deserialize_master_volume",
@@ -304,6 +558,8 @@ pub struct AppSettings {
     pub animation_categories: AnimationCategories,
     #[serde(default, alias = "mod_list_enabled")]
     pub mod_list_enabled: Vec<String>,
+    #[serde(default, alias = "virtual_controller")]
+    pub virtual_controller: VirtualControllerSettings,
     #[serde(flatten)]
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
@@ -371,6 +627,10 @@ impl Default for AppSettings {
             arrow_nav: true,
             open_logs: false,
             hq_audio: true,
+            media_expand_button: true,
+            panel_fill_width: true,
+            media_viewer_gestures: true,
+            swf_auto_landscape: true,
             master_volume: default_master_volume(),
             master_muted: false,
             js_flashes: true,
@@ -395,6 +655,7 @@ impl Default for AppSettings {
             animation_fps: default_animation_fps(),
             animation_categories: AnimationCategories::default(),
             mod_list_enabled: Vec::new(),
+            virtual_controller: VirtualControllerSettings::default(),
             extra: serde_json::Map::new(),
         }
     }
@@ -513,6 +774,25 @@ impl AppConfig {
             || self.settings.master_volume.is_nan()
         {
             self.settings.master_volume = clamped_vol;
+            changed = true;
+        }
+        let vc = &mut self.settings.virtual_controller;
+        let clamped_opacity = if vc.opacity.is_nan() {
+            default_vc_opacity()
+        } else {
+            vc.opacity.clamp(0.15, 1.0)
+        };
+        if (vc.opacity - clamped_opacity).abs() > f64::EPSILON || vc.opacity.is_nan() {
+            vc.opacity = clamped_opacity;
+            changed = true;
+        }
+        let clamped_scale = if vc.scale.is_nan() {
+            default_vc_scale()
+        } else {
+            vc.scale.clamp(0.5, 1.8)
+        };
+        if (vc.scale - clamped_scale).abs() > f64::EPSILON || vc.scale.is_nan() {
+            vc.scale = clamped_scale;
             changed = true;
         }
         changed
