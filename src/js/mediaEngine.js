@@ -202,6 +202,9 @@
     activeIframeElement = null;
     currentFlashProps = null;
     lastStartedAudio = 0;
+    if (typeof root !== 'undefined' && typeof root.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+      root.dispatchEvent(new CustomEvent('rrwr:media-updated', { detail: { interactive: false } }));
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -269,15 +272,16 @@
       background-color: ${bgColor};
       display: flex;
       justify-content: center;
-      align-items: flex-start;
+      align-items: center;
     }
     #ruffle-container {
-      width: ${width}px;
-      height: ${height}px;
+      width: 100%;
+      height: 100%;
       max-width: 100%;
+      max-height: 100%;
       display: flex;
       justify-content: center;
-      align-items: flex-start;
+      align-items: center;
       overflow: hidden;
     }
     ruffle-player, ruffle-embed, ruffle-object, object, embed {
@@ -549,6 +553,52 @@
 
       window.__rrwrApplyRuffleVolume = applyRuffleVolume;
 
+      function dispatchVirtualKey(eventType, keyInfo) {
+        if (!keyInfo || (eventType !== 'keydown' && eventType !== 'keyup')) return;
+        var player = document.getElementById('player') || document.querySelector('ruffle-player');
+        if (eventType === 'keydown' && player && typeof player.focus === 'function') {
+          try {
+            if (document.activeElement !== player) {
+              player.focus({ preventScroll: true });
+            }
+          } catch (_) {}
+        }
+        var opts = {
+          key: String(keyInfo.key || ''),
+          code: String(keyInfo.code || ''),
+          keyCode: Number(keyInfo.keyCode || 0),
+          which: Number(keyInfo.keyCode || 0),
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        };
+        var targets = [];
+        if (player) {
+          if (player.shadowRoot) {
+            var canvas = player.shadowRoot.querySelector('canvas, [tabindex]') || player.shadowRoot.firstElementChild;
+            if (canvas) targets.push(canvas);
+          }
+          targets.push(player);
+        }
+        if (document.activeElement && targets.indexOf(document.activeElement) === -1) {
+          targets.push(document.activeElement);
+        }
+        targets.push(document);
+        for (var i = 0; i < targets.length; i++) {
+          var t = targets[i];
+          if (!t || typeof t.dispatchEvent !== 'function') continue;
+          try {
+            var ev = new KeyboardEvent(eventType, opts);
+            try {
+              Object.defineProperty(ev, 'keyCode', { get: function () { return opts.keyCode; } });
+              Object.defineProperty(ev, 'which', { get: function () { return opts.keyCode; } });
+            } catch (_) {}
+            t.dispatchEvent(ev);
+            break;
+          } catch (_) {}
+        }
+      }
+
       window.addEventListener('message', function (event) {
         if (event.data && event.data.type === 'RRWR_MASTER_VOLUME') {
           rrwrMasterVolume = Number.isFinite(Number(event.data.volume))
@@ -558,6 +608,8 @@
             rrwrMasterMuted = Boolean(event.data.muted);
           }
           applyRuffleVolume();
+        } else if (event.data && event.data.type === 'RRWR_VIRTUAL_KEY') {
+          dispatchVirtualKey(event.data.eventType, event.data.keyInfo);
         }
       });
     })();
@@ -1500,8 +1552,12 @@
         iframe.setAttribute('data-flash-id', gameKey);
         iframe.setAttribute('allow', 'autoplay; fullscreen');
         iframe.setAttribute('tabindex', '0');
-        iframe.style.width = `${resolved.width}px`;
-        iframe.style.height = initialHeight;
+        const numericHeight = parseInt(initialHeight, 10) || resolved.height || 450;
+        const numericWidth = resolved.width || 650;
+        iframe.style.width = '100%';
+        iframe.style.maxWidth = `${numericWidth}px`;
+        iframe.style.aspectRatio = `${numericWidth} / ${numericHeight}`;
+        iframe.style.height = 'auto';
         iframe.style.border = 'none';
         iframe.style.overflow = 'hidden';
         iframe.style.display = 'block';
@@ -1546,8 +1602,12 @@
         iframe.setAttribute('data-media-type', 'html-game-canvas');
         iframe.setAttribute('allow', 'autoplay; fullscreen');
         iframe.src = resolved.resolvedUrl;
-        iframe.width = String(resolved.width || 650);
-        iframe.height = String(resolved.height || 450);
+        const htmlW = resolved.width || 650;
+        const htmlH = resolved.height || 450;
+        iframe.style.width = '100%';
+        iframe.style.maxWidth = `${htmlW}px`;
+        iframe.style.aspectRatio = `${htmlW} / ${htmlH}`;
+        iframe.style.height = 'auto';
         iframe.style.border = 'none';
         iframe.style.overflow = 'hidden';
         iframe.style.display = 'block';
@@ -1605,6 +1665,10 @@
         containerEl.appendChild(img);
       }
     }
+    if (typeof root !== 'undefined' && typeof root.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+      const hasInteractive = activeIframes.some((f) => f && (f.classList.contains('ruffle-frame') || f.classList.contains('html-game-frame')));
+      root.dispatchEvent(new CustomEvent('rrwr:media-updated', { detail: { interactive: hasInteractive } }));
+    }
     return true;
   }
 
@@ -1628,6 +1692,10 @@
     // Internal state inspectors for unit and E2E verification
     getActiveAudio: () => activeAudioTracks,
     getActiveIframes: () => activeIframes,
+    hasInteractiveEmbed: () =>
+      activeIframes.some(
+        (f) => f && (f.classList.contains('ruffle-frame') || f.classList.contains('html-game-frame'))
+      ),
     getLastStartedAudio: () => lastStartedAudio,
     getViewportTimer: () => viewportTimer,
     getStageProgressState: () => stageProgressState,

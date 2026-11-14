@@ -78,6 +78,10 @@
         themeOverride: 'default',
         forceThemeOverride: false,
         hqAudio: true,
+        mediaExpandButton: true,
+        panelFillWidth: true,
+        mediaViewerGestures: true,
+        swfAutoLandscape: true,
         masterVolume: 1.0,
         masterMuted: false,
         jsFlashes: true,
@@ -327,11 +331,20 @@
     }
 
     if (tauriInvoke) {
-      try {
-        return await tauriInvoke(command, payload);
-      } catch (err) {
-        // Fall back to HTTP if Tauri invoke fails in development or hybrid mode
-        console.warn(`[RRWR-IPC] Tauri invoke failed for '${command}', falling back to HTTP:`, err);
+      const maxAttempts = 30;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+          return await tauriInvoke(command, payload);
+        } catch (err) {
+          const msg = String(err || '');
+          if (msg.includes('state not managed') && attempt < maxAttempts - 1) {
+            await new Promise((r) => setTimeout(r, 100));
+            continue;
+          }
+          // Fall back to HTTP if Tauri invoke fails in development or hybrid mode
+          console.warn(`[RRWR-IPC] Tauri invoke failed for '${command}', falling back to HTTP:`, err);
+          break;
+        }
       }
     }
 
@@ -1801,7 +1814,7 @@
               mediaList,
               page,
               {
-                settings,
+                settings: (state.config && state.config.settings) || {},
                 assetBase: state.assetBase,
                 cacheBuster: state.overlayGeneration,
                 navigate: pushUrl,
@@ -3377,6 +3390,60 @@
           </div>
         </div>
 
+        <!-- Section 3b: Virtual Controller (Mobile / Touch) -->
+        ${isMobileTouchEnvironment() ? `
+        <div class="settingsSectionCard">
+          <h2>Virtual Game Controller</h2>
+          <div class="settingRow">
+            <label for="setting-vc-mode">Overlay Visibility:</label>
+            <select id="setting-vc-mode">
+              <option value="auto" ${((settings.virtualController && settings.virtualController.mode) || 'auto') === 'auto' ? 'selected' : ''}>Auto (SWF Fullscreen)</option>
+              <option value="always" ${(settings.virtualController && settings.virtualController.mode) === 'always' ? 'selected' : ''}>Always Visible</option>
+              <option value="off" ${(settings.virtualController && settings.virtualController.mode) === 'off' ? 'selected' : ''}>Off</option>
+            </select>
+          </div>
+          <div class="settingRow">
+            <label for="setting-vc-layout">Directional Layout:</label>
+            <select id="setting-vc-layout">
+              ${(window.RRWRVirtualControllerUtils ? window.RRWRVirtualControllerUtils.LAYOUTS : [
+                { id: 'joystick-round', label: 'Analog Stick' },
+                { id: 'dpad-8way', label: '8-Way Arcade' },
+                { id: 'dpad-4way', label: '4-Way Cross' },
+                { id: 'wasd-slide', label: 'Slide Keys' },
+                { id: 'floating-zone', label: 'Floating Stick' }
+              ]).map((l) => `<option value="${l.id}" ${((settings.virtualController && settings.virtualController.layout) || 'joystick-round') === l.id ? 'selected' : ''}>${escapeHtml(l.label)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="settingRow">
+            <label>Keybindings, Buttons &amp; Screen Position:</label>
+            <button type="button" id="setting-vc-customize-btn">Configure Virtual Controller</button>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Section 3c: Media & Fullscreen Experience -->
+        <div class="settingsSectionCard">
+          <h2>Media &amp; Fullscreen Experience</h2>
+          <div class="settingRow">
+            <label for="setting-media-expand-btn">Show Expand Button Below Media:</label>
+            <input type="checkbox" id="setting-media-expand-btn" ${settings.mediaExpandButton !== false ? 'checked' : ''} />
+          </div>
+          <div class="settingRow">
+            <label for="setting-panel-fill-width">Fill Panel Width:</label>
+            <input type="checkbox" id="setting-panel-fill-width" ${settings.panelFillWidth !== false ? 'checked' : ''} />
+          </div>
+          <div class="settingRow">
+            <label for="setting-mv-gestures">Enable Viewer Touch Gestures (Pinch, Rotate, Swipe):</label>
+            <input type="checkbox" id="setting-mv-gestures" ${settings.mediaViewerGestures !== false ? 'checked' : ''} />
+          </div>
+          ${isMobileTouchEnvironment() ? `
+          <div class="settingRow">
+            <label for="setting-swf-auto-landscape">Auto-Landscape in SWF Gaming Mode:</label>
+            <input type="checkbox" id="setting-swf-auto-landscape" ${settings.swfAutoLandscape !== false ? 'checked' : ''} />
+          </div>
+          ` : ''}
+        </div>
+
         <!-- Section 4: Discord Rich Presence (RPC) -->
         ${isAndroid ? '' : `
         <div class="settingsSectionCard">
@@ -3612,6 +3679,68 @@
 
     const hqBox = container.querySelector('#setting-hq-audio');
     if (hqBox) hqBox.addEventListener('change', (e) => { settings.hqAudio = e.target.checked; persistConfig(); });
+
+    const expandBtnBox = container.querySelector('#setting-media-expand-btn');
+    if (expandBtnBox) {
+      expandBtnBox.addEventListener('change', (e) => {
+        settings.mediaExpandButton = e.target.checked;
+        applyMediaExperienceSettings();
+        persistConfig();
+      });
+    }
+    const fillWidthBox = container.querySelector('#setting-panel-fill-width');
+    if (fillWidthBox) {
+      fillWidthBox.addEventListener('change', (e) => {
+        settings.panelFillWidth = e.target.checked;
+        applyMediaExperienceSettings();
+        persistConfig();
+      });
+    }
+    const mvGesturesBox = container.querySelector('#setting-mv-gestures');
+    if (mvGesturesBox) {
+      mvGesturesBox.addEventListener('change', (e) => {
+        settings.mediaViewerGestures = e.target.checked;
+        persistConfig();
+      });
+    }
+    const swfLandscapeBox = container.querySelector('#setting-swf-auto-landscape');
+    if (swfLandscapeBox) {
+      swfLandscapeBox.addEventListener('change', (e) => {
+        settings.swfAutoLandscape = e.target.checked;
+        persistConfig();
+      });
+    }
+
+    const vcModeSelect = container.querySelector('#setting-vc-mode');
+    if (vcModeSelect) {
+      vcModeSelect.addEventListener('change', (e) => {
+        if (!settings.virtualController) settings.virtualController = {};
+        settings.virtualController.mode = e.target.value;
+        if (window.RRWRVirtualController) {
+          window.RRWRVirtualController.setConfig(settings.virtualController);
+        }
+        persistConfig();
+      });
+    }
+    const vcLayoutSelect = container.querySelector('#setting-vc-layout');
+    if (vcLayoutSelect) {
+      vcLayoutSelect.addEventListener('change', (e) => {
+        if (!settings.virtualController) settings.virtualController = {};
+        settings.virtualController.layout = e.target.value;
+        if (window.RRWRVirtualController) {
+          window.RRWRVirtualController.setConfig(settings.virtualController);
+        }
+        persistConfig();
+      });
+    }
+    const vcCustomizeBtn = container.querySelector('#setting-vc-customize-btn');
+    if (vcCustomizeBtn) {
+      vcCustomizeBtn.addEventListener('click', () => {
+        if (window.RRWRVirtualController) {
+          window.RRWRVirtualController.openCustomizerModal();
+        }
+      });
+    }
 
     // Community mod supergroups -> expand/collapse Enabled and Disabled sections
     const modGroupHeaders = container.querySelectorAll('.modSupergroupHeader');
@@ -5481,14 +5610,34 @@
     scale: 1,
     tx: 0,
     ty: 0,
+    rotation: 0,
     fitMode: 'fit',
     pixelated: false,
     dragging: false,
+    pinching: false,
+    swipeClosing: false,
+    swipeDy: 0,
+    movedDist: 0,
     startX: 0,
     startY: 0,
     origTx: 0,
     origTy: 0
   };
+
+  const MEDIA_EXPAND_ICON_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><path d="M10 2h4v4M14 2l-4.5 4.5M6 14H2v-4M2 14l4.5-4.5"/></svg>';
+  const MEDIA_COLLAPSE_ICON_SVG = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><path d="M14 6h-4V2M10 6l4.5-4.5M2 10h4v4M6 10l-4.5 4.5"/></svg>';
+  const MEDIA_GAMING_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="4"/><path d="M6 12h4M8 10v4"/><circle cx="15.5" cy="11" r="1" fill="currentColor"/><circle cx="17.5" cy="13" r="1" fill="currentColor"/></svg>';
+
+  function setMediaExpandButtonIcon(btn, expanded, isEmbed = false) {
+    if (!btn) return;
+    btn.innerHTML = expanded ? MEDIA_COLLAPSE_ICON_SVG : MEDIA_EXPAND_ICON_SVG;
+    btn.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+    const label = isEmbed
+      ? (expanded ? 'Exit Fullscreen (Esc)' : 'Toggle Asset Fullscreen (Esc to exit)')
+      : 'Open Fullscreen Media Viewer';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  }
 
   function togglePageFullscreen(forceState) {
     const active = typeof forceState === 'boolean'
@@ -5509,7 +5658,7 @@
     if (mediaViewerState.fitMode === 'actual') img.classList.add('fit-actual');
     else if (mediaViewerState.fitMode === 'width') img.classList.add('fit-width');
     img.classList.toggle('pixelated', mediaViewerState.pixelated);
-    img.style.transform = `translate3d(${mediaViewerState.tx}px, ${mediaViewerState.ty}px, 0) scale(${mediaViewerState.scale})`;
+    img.style.transform = `translate3d(${mediaViewerState.tx}px, ${mediaViewerState.ty}px, 0) rotate(${mediaViewerState.rotation}deg) scale(${mediaViewerState.scale})`;
     if (label) label.textContent = `${Math.round(mediaViewerState.scale * 100)}%`;
 
     const fitBtns = document.querySelectorAll('#media-viewer-overlay [data-fit]');
@@ -5519,7 +5668,7 @@
     const renderBtn = document.getElementById('mv-render-mode-btn');
     if (renderBtn) {
       renderBtn.setAttribute('aria-pressed', mediaViewerState.pixelated ? 'true' : 'false');
-      renderBtn.textContent = mediaViewerState.pixelated ? 'Crisp: On' : 'Crisp: Off';
+      renderBtn.textContent = 'Crisp';
     }
   }
 
@@ -5527,25 +5676,89 @@
     mediaViewerState.scale = 1;
     mediaViewerState.tx = 0;
     mediaViewerState.ty = 0;
+    mediaViewerState.rotation = 0;
     mediaViewerState.fitMode = 'fit';
     applyMediaViewerTransform();
   }
 
+  function setMobileLandscapeFullscreen(enabled, { preferLandscape = false } = {}) {
+    const active = Boolean(enabled);
+    const landscape = Boolean(enabled && preferLandscape);
+    document.body.classList.toggle('rrwr-asset-fullscreen', active);
+    document.body.classList.toggle('rrwr-swf-fullscreen', landscape);
+    try {
+      window.dispatchEvent(new CustomEvent('rrwr:asset-fullscreen-change', { detail: { active, isSwf: landscape } }));
+    } catch (_) {}
+    try {
+      if (window.RRWRAndroidNative && typeof window.RRWRAndroidNative.setAssetFullscreen === 'function') {
+        window.RRWRAndroidNative.setAssetFullscreen(active, landscape);
+      } else if (window.RRWRAndroidNative && typeof window.RRWRAndroidNative.setFullscreenLandscape === 'function') {
+        window.RRWRAndroidNative.setFullscreenLandscape(landscape);
+      }
+    } catch (_) {}
+    try {
+      const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      if (isTouch && window.screen && window.screen.orientation) {
+        if (landscape && typeof window.screen.orientation.lock === 'function') {
+          window.screen.orientation.lock('landscape').catch(() => {});
+        } else if (!active && typeof window.screen.orientation.unlock === 'function') {
+          window.screen.orientation.unlock();
+        }
+      }
+    } catch (_) {}
+  }
+
   function openMediaViewer(src, alt) {
     const overlay = document.getElementById('media-viewer-overlay');
+    const stage = document.getElementById('media-viewer-stage');
     const img = document.getElementById('media-viewer-img');
     if (!overlay || !img || !src) return;
     img.src = src;
     img.alt = alt || '';
     mediaViewerState.pixelated = false;
+    if (stage) {
+      stage.style.transform = '';
+      stage.style.opacity = '';
+    }
     resetMediaViewer();
-    overlay.classList.remove('hidden');
+    if (window.RRWRAnimations && typeof window.RRWRAnimations.openLightbox === 'function') {
+      window.RRWRAnimations.openLightbox(overlay);
+    } else {
+      overlay.classList.remove('hidden');
+    }
+    setMobileLandscapeFullscreen(true, { preferLandscape: false });
   }
 
   function closeMediaViewer() {
     const overlay = document.getElementById('media-viewer-overlay');
+    const stage = document.getElementById('media-viewer-stage');
     if (!overlay) return;
-    overlay.classList.add('hidden');
+    if (stage) {
+      stage.style.transform = '';
+      stage.style.opacity = '';
+    }
+    const finalize = () => {
+      setMobileLandscapeFullscreen(false, { preferLandscape: false });
+    };
+    if (window.RRWRAnimations && typeof window.RRWRAnimations.closeLightbox === 'function') {
+      window.RRWRAnimations.closeLightbox(overlay, finalize);
+    } else {
+      overlay.classList.add('hidden');
+      finalize();
+    }
+  }
+
+  function isMobileTouchEnvironment() {
+    if (window.RRWRAndroidNative) return true;
+    const ua = (navigator && navigator.userAgent) || '';
+    if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true;
+    return Boolean(window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+  }
+
+  function applyMediaExperienceSettings() {
+    const s = (state.config && state.config.settings) || {};
+    document.body.classList.toggle('rrwr-hide-expand-btn', s.mediaExpandButton === false);
+    document.body.classList.toggle('rrwr-panel-natural-size', s.panelFillWidth === false);
   }
 
   function enhanceMediaContainers(container) {
@@ -5558,18 +5771,20 @@
       img.parentNode.insertBefore(wrapper, img);
       wrapper.appendChild(img);
 
+      const actionBar = document.createElement('div');
+      actionBar.className = 'mediaActionBar';
+
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'mediaExpandBtn';
-      btn.textContent = 'Expand';
-      btn.title = 'Open Fullscreen Media Viewer';
-      btn.setAttribute('aria-label', 'Open Fullscreen Media Viewer');
+      setMediaExpandButtonIcon(btn, false, false);
       btn.addEventListener('click', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
         openMediaViewer(img.currentSrc || img.src, img.alt);
       });
-      wrapper.appendChild(btn);
+      actionBar.appendChild(btn);
+      wrapper.appendChild(actionBar);
 
       img.addEventListener('dblclick', (ev) => {
         ev.preventDefault();
@@ -5577,26 +5792,89 @@
       });
     }
 
-    const swfBoxes = Array.from(container.querySelectorAll('.swf-embed-container'));
-    for (const box of swfBoxes) {
-      if (box.querySelector('.mediaExpandBtn')) continue;
+    const embedTargets = Array.from(
+      container.querySelectorAll('.swf-embed-container, iframe.page-media-flash, iframe.html-game-frame, video.page-media-video')
+    );
+    for (const target of embedTargets) {
+      let host = target;
+      if (!target.classList.contains('swf-embed-container')) {
+        if (target.closest('.mediaFrameWrapper')) continue;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mediaFrameWrapper mediaFrameWrapper--embed';
+        target.parentNode.insertBefore(wrapper, target);
+        wrapper.appendChild(target);
+        host = wrapper;
+      }
+      if (host.querySelector('.mediaExpandBtn')) continue;
+      const isSwf = host.classList.contains('swf-embed-container')
+        || target.classList.contains('page-media-flash')
+        || Boolean(host.querySelector('ruffle-player, ruffle-embed, object, embed, .page-media-flash'));
+
+      const actionBar = document.createElement('div');
+      actionBar.className = 'mediaActionBar';
+
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'mediaExpandBtn';
-      btn.textContent = 'Fullscreen';
-      btn.title = 'Toggle Flash Fullscreen (Esc to exit)';
-      btn.setAttribute('aria-label', 'Toggle Flash Fullscreen');
+      setMediaExpandButtonIcon(btn, false, true);
+
+      let gamingBtn = null;
+      if (isSwf && isMobileTouchEnvironment()) {
+        gamingBtn = document.createElement('button');
+        gamingBtn.type = 'button';
+        gamingBtn.className = 'mediaGamingBtn';
+        gamingBtn.innerHTML = MEDIA_GAMING_ICON_SVG;
+        gamingBtn.title = 'Gaming Mode (Landscape + Controls)';
+        gamingBtn.setAttribute('aria-label', 'Toggle Gaming Mode');
+        gamingBtn.setAttribute('aria-pressed', 'false');
+        gamingBtn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const enteringGaming = !host.classList.contains('rrwr-media-gaming');
+          const s = (state.config && state.config.settings) || {};
+          const preferLandscape = s.swfAutoLandscape !== false;
+          if (enteringGaming) {
+            host.classList.add('rrwr-media-expanded', 'rrwr-media-gaming');
+            gamingBtn.classList.add('active');
+            gamingBtn.setAttribute('aria-pressed', 'true');
+            setMediaExpandButtonIcon(btn, true, true);
+            setMobileLandscapeFullscreen(true, { preferLandscape });
+          } else {
+            host.classList.remove('rrwr-media-gaming', 'rrwr-media-expanded');
+            gamingBtn.classList.remove('active');
+            gamingBtn.setAttribute('aria-pressed', 'false');
+            setMediaExpandButtonIcon(btn, false, true);
+            setMobileLandscapeFullscreen(false, { preferLandscape: false });
+          }
+        });
+        actionBar.appendChild(gamingBtn);
+      }
+
       btn.addEventListener('click', (ev) => {
         ev.preventDefault();
         ev.stopPropagation();
-        const expanded = box.classList.toggle('rrwr-media-expanded');
-        btn.textContent = expanded ? 'Exit Fullscreen' : 'Fullscreen';
+        const expanded = host.classList.toggle('rrwr-media-expanded');
+        if (!expanded) {
+          host.classList.remove('rrwr-media-gaming');
+          if (gamingBtn) {
+            gamingBtn.classList.remove('active');
+            gamingBtn.setAttribute('aria-pressed', 'false');
+          }
+        }
+        setMediaExpandButtonIcon(btn, expanded, true);
+        setMobileLandscapeFullscreen(expanded, { preferLandscape: false });
       });
-      box.appendChild(btn);
+      actionBar.appendChild(btn);
+      host.appendChild(actionBar);
     }
   }
 
   function setupFullscreenAndMediaViewer() {
+    applyMediaExperienceSettings();
+    const navCtrlBtn = document.getElementById('nav-controller-btn');
+    if (navCtrlBtn && !isMobileTouchEnvironment()) {
+      navCtrlBtn.classList.add('hidden');
+    }
     const navFsBtn = document.getElementById('nav-fullscreen-btn');
     if (navFsBtn) {
       navFsBtn.addEventListener('click', () => togglePageFullscreen());
@@ -5660,37 +5938,196 @@
       applyMediaViewerTransform();
     }, { passive: false });
 
+    const activePointers = new Map();
+    let pinchStartDist = 0;
+    let pinchStartScale = 1;
+    let pinchStartAngle = 0;
+    let pinchStartRotation = 0;
+    let pinchLastMidX = 0;
+    let pinchLastMidY = 0;
+    let lastTapTime = 0;
+    let lastTapX = 0;
+    let lastTapY = 0;
+    let lastTouchDoubleTapAt = 0;
+
+    function getStageCenter() {
+      const rect = stage.getBoundingClientRect();
+      return { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2 };
+    }
+
+    function zoomAroundClientPoint(targetScale, clientX, clientY) {
+      const clamped = Math.min(8, Math.max(0.25, Number(targetScale.toFixed(3))));
+      const oldScale = mediaViewerState.scale || 1;
+      const ratio = clamped / oldScale;
+      const { cx, cy } = getStageCenter();
+      const px = clientX - cx;
+      const py = clientY - cy;
+      mediaViewerState.scale = clamped;
+      mediaViewerState.tx = px - (px - mediaViewerState.tx) * ratio;
+      mediaViewerState.ty = py - (py - mediaViewerState.ty) * ratio;
+      applyMediaViewerTransform();
+    }
+
     stage.addEventListener('pointerdown', (ev) => {
-      if (ev.button !== 0) return;
-      mediaViewerState.dragging = true;
-      mediaViewerState.startX = ev.clientX;
-      mediaViewerState.startY = ev.clientY;
-      mediaViewerState.origTx = mediaViewerState.tx;
-      mediaViewerState.origTy = mediaViewerState.ty;
-      stage.classList.add('is-dragging');
-      img.classList.add('is-dragging');
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+      const touchGesturesEnabled = (state.config && state.config.settings && state.config.settings.mediaViewerGestures) !== false;
+      if (ev.pointerType !== 'mouse' && !touchGesturesEnabled) return;
+      activePointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
       if (typeof stage.setPointerCapture === 'function') {
         try { stage.setPointerCapture(ev.pointerId); } catch (_) {}
+      }
+
+      if (activePointers.size === 1) {
+        mediaViewerState.dragging = true;
+        mediaViewerState.pinching = false;
+        mediaViewerState.swipeClosing = false;
+        mediaViewerState.swipeDy = 0;
+        mediaViewerState.movedDist = 0;
+        mediaViewerState.startX = ev.clientX;
+        mediaViewerState.startY = ev.clientY;
+        mediaViewerState.origTx = mediaViewerState.tx;
+        mediaViewerState.origTy = mediaViewerState.ty;
+        stage.classList.add('is-dragging');
+        img.classList.add('is-dragging');
+      } else if (activePointers.size === 2) {
+        const pts = Array.from(activePointers.values());
+        pinchStartDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        pinchStartScale = mediaViewerState.scale;
+        pinchStartAngle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+        pinchStartRotation = mediaViewerState.rotation;
+        pinchLastMidX = (pts[0].x + pts[1].x) / 2;
+        pinchLastMidY = (pts[0].y + pts[1].y) / 2;
+        mediaViewerState.pinching = true;
+        mediaViewerState.dragging = false;
+        mediaViewerState.swipeClosing = false;
+        mediaViewerState.swipeDy = 0;
+        stage.style.transform = '';
+        stage.style.opacity = '';
+        stage.classList.add('is-dragging');
+        img.classList.add('is-dragging');
       }
     });
 
     stage.addEventListener('pointermove', (ev) => {
-      if (!mediaViewerState.dragging) return;
-      mediaViewerState.tx = mediaViewerState.origTx + (ev.clientX - mediaViewerState.startX);
-      mediaViewerState.ty = mediaViewerState.origTy + (ev.clientY - mediaViewerState.startY);
-      applyMediaViewerTransform();
+      if (!activePointers.has(ev.pointerId)) return;
+      activePointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+
+      if (activePointers.size >= 2 && mediaViewerState.pinching) {
+        const pts = Array.from(activePointers.values());
+        const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        const midX = (pts[0].x + pts[1].x) / 2;
+        const midY = (pts[0].y + pts[1].y) / 2;
+        if (pinchStartDist > 0) {
+          const nextScale = Math.min(8, Math.max(0.25, pinchStartScale * (dist / pinchStartDist)));
+          const oldScale = mediaViewerState.scale || 1;
+          const ratio = nextScale / oldScale;
+          const { cx, cy } = getStageCenter();
+          const px = midX - cx;
+          const py = midY - cy;
+          mediaViewerState.scale = Number(nextScale.toFixed(3));
+          mediaViewerState.tx = px - (px - mediaViewerState.tx) * ratio + (midX - pinchLastMidX);
+          mediaViewerState.ty = py - (py - mediaViewerState.ty) * ratio + (midY - pinchLastMidY);
+
+          const angle = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+          let deltaDeg = (angle - pinchStartAngle) * (180 / Math.PI);
+          while (deltaDeg > 180) deltaDeg -= 360;
+          while (deltaDeg < -180) deltaDeg += 360;
+          mediaViewerState.rotation = Number((pinchStartRotation + deltaDeg).toFixed(2));
+
+          pinchLastMidX = midX;
+          pinchLastMidY = midY;
+          applyMediaViewerTransform();
+        }
+        return;
+      }
+
+      if (activePointers.size === 1 && mediaViewerState.dragging) {
+        const dx = ev.clientX - mediaViewerState.startX;
+        const dy = ev.clientY - mediaViewerState.startY;
+        mediaViewerState.movedDist = Math.max(mediaViewerState.movedDist, Math.hypot(dx, dy));
+
+        const canSwipeClose = mediaViewerState.scale <= 1.02 && Math.abs(mediaViewerState.rotation % 360) < 2 && mediaViewerState.fitMode === 'fit';
+        if (canSwipeClose && (mediaViewerState.swipeClosing || (dy > 12 && Math.abs(dy) > Math.abs(dx) * 1.4))) {
+          mediaViewerState.swipeClosing = true;
+          mediaViewerState.swipeDy = Math.max(0, dy);
+          stage.style.transform = `translate3d(0, ${mediaViewerState.swipeDy}px, 0)`;
+          stage.style.opacity = String(Math.max(0.25, 1 - mediaViewerState.swipeDy / 340));
+          return;
+        }
+
+        if (mediaViewerState.scale > 1.01 || Math.abs(mediaViewerState.rotation % 360) >= 2 || mediaViewerState.fitMode !== 'fit') {
+          mediaViewerState.tx = mediaViewerState.origTx + dx;
+          mediaViewerState.ty = mediaViewerState.origTy + dy;
+          applyMediaViewerTransform();
+        }
+      }
     });
 
-    const endDrag = () => {
-      if (!mediaViewerState.dragging) return;
-      mediaViewerState.dragging = false;
-      stage.classList.remove('is-dragging');
-      img.classList.remove('is-dragging');
+    const endPointer = (ev) => {
+      if (!activePointers.has(ev.pointerId)) return;
+      activePointers.delete(ev.pointerId);
+      if (typeof stage.releasePointerCapture === 'function') {
+        try { stage.releasePointerCapture(ev.pointerId); } catch (_) {}
+      }
+
+      if (activePointers.size === 1 && mediaViewerState.pinching) {
+        const [rem] = activePointers.values();
+        mediaViewerState.pinching = false;
+        mediaViewerState.dragging = true;
+        mediaViewerState.startX = rem.x;
+        mediaViewerState.startY = rem.y;
+        mediaViewerState.origTx = mediaViewerState.tx;
+        mediaViewerState.origTy = mediaViewerState.ty;
+        mediaViewerState.movedDist = 999;
+        return;
+      }
+
+      if (activePointers.size === 0) {
+        const wasSwipeClosing = mediaViewerState.swipeClosing;
+        const swipeDy = mediaViewerState.swipeDy;
+        const swipeDx = ev.clientX - mediaViewerState.startX;
+        const movedDist = mediaViewerState.movedDist;
+        const wasPinching = mediaViewerState.pinching;
+
+        mediaViewerState.dragging = false;
+        mediaViewerState.pinching = false;
+        mediaViewerState.swipeClosing = false;
+        mediaViewerState.swipeDy = 0;
+        stage.classList.remove('is-dragging');
+        img.classList.remove('is-dragging');
+
+        if (wasSwipeClosing) {
+          stage.style.transform = '';
+          stage.style.opacity = '';
+          if (ev.type === 'pointerup' && swipeDy > 72 && Math.abs(swipeDy) > Math.abs(swipeDx) * 1.4) {
+            closeMediaViewer();
+            return;
+          }
+        }
+
+        if (ev.type === 'pointerup' && ev.pointerType !== 'mouse' && !wasPinching && movedDist < 12) {
+          const now = Date.now();
+          if (now - lastTapTime <= 300 && Math.hypot(ev.clientX - lastTapX, ev.clientY - lastTapY) <= 28) {
+            lastTapTime = 0;
+            lastTouchDoubleTapAt = now;
+            if (mediaViewerState.scale <= 1.05) {
+              zoomAroundClientPoint(2, ev.clientX, ev.clientY);
+            } else {
+              resetMediaViewer();
+            }
+          } else {
+            lastTapTime = now;
+            lastTapX = ev.clientX;
+            lastTapY = ev.clientY;
+          }
+        }
+      }
     };
-    stage.addEventListener('pointerup', endDrag);
-    stage.addEventListener('pointercancel', endDrag);
+    stage.addEventListener('pointerup', endPointer);
+    stage.addEventListener('pointercancel', endPointer);
 
     stage.addEventListener('dblclick', (ev) => {
+      if (Date.now() - lastTouchDoubleTapAt < 450) return;
       if (ev.target === stage || ev.target === img) {
         closeMediaViewer();
       }
@@ -5848,12 +6285,18 @@
           closeMediaViewer();
           return;
         }
-        const expandedSwf = document.querySelector('.swf-embed-container.rrwr-media-expanded');
-        if (expandedSwf) {
+        const expandedMedia = document.querySelector('.rrwr-media-expanded');
+        if (expandedMedia) {
           e.preventDefault();
-          expandedSwf.classList.remove('rrwr-media-expanded');
-          const btn = expandedSwf.querySelector('.mediaExpandBtn');
-          if (btn) btn.textContent = 'Fullscreen';
+          expandedMedia.classList.remove('rrwr-media-expanded', 'rrwr-media-gaming');
+          const btn = expandedMedia.querySelector('.mediaExpandBtn');
+          if (btn) setMediaExpandButtonIcon(btn, false, true);
+          const gBtn = expandedMedia.querySelector('.mediaGamingBtn');
+          if (gBtn) {
+            gBtn.classList.remove('active');
+            gBtn.setAttribute('aria-pressed', 'false');
+          }
+          setMobileLandscapeFullscreen(false, { preferLandscape: false });
           return;
         }
         if (document.body.classList.contains('rrwr-page-fullscreen')) {
@@ -6031,6 +6474,15 @@
       settingsBtn.addEventListener('click', () => pushUrl('/settings'));
     }
 
+    const controllerBtn = document.getElementById('nav-controller-btn');
+    if (controllerBtn) {
+      controllerBtn.addEventListener('click', () => {
+        if (window.RRWRVirtualController) {
+          window.RRWRVirtualController.toggleOverlay();
+        }
+      });
+    }
+
     setupVolumeControls();
 
     // Address input & Jumpbox prompt
@@ -6201,6 +6653,17 @@
       if (animEngine) {
         animEngine.applySettings(state.config.settings);
         animEngine.updateBootSplash(82, '> INITIALIZING READER INTERFACE...');
+      }
+
+      if (window.RRWRVirtualController) {
+        window.RRWRVirtualController.init({
+          config: loadedSettings.virtualController || loadedSettings.virtual_controller,
+          onSave: (vcConfig) => {
+            if (!state.config.settings) state.config.settings = {};
+            state.config.settings.virtualController = vcConfig;
+            persistConfig();
+          },
+        });
       }
 
       // 3. Setup UI Chromes & Event Listeners
