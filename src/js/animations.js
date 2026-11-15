@@ -61,10 +61,29 @@
   const entryScrollMap = new Map();
   const tabLatestScrollMap = new Map();
   const elementTokens = new WeakMap();
+  const widgetClassTokens = new WeakMap();
   const activeFlipCancels = new WeakMap();
+  let cachedAppEl = null;
+  let cachedReducedMql = null;
 
   function hasDom() {
     return typeof document !== 'undefined' && typeof window !== 'undefined';
+  }
+
+  function getAppEl() {
+    if (!hasDom()) return null;
+    if (!cachedAppEl || !cachedAppEl.isConnected) {
+      cachedAppEl = document.getElementById('app');
+    }
+    return cachedAppEl;
+  }
+
+  function isReducedMotionPreferred() {
+    if (!hasDom() || typeof window.matchMedia !== 'function') return false;
+    if (!cachedReducedMql) {
+      cachedReducedMql = window.matchMedia('(prefers-reduced-motion: reduce)');
+    }
+    return Boolean(cachedReducedMql && cachedReducedMql.matches);
   }
 
   function getPerf() {
@@ -109,8 +128,14 @@
      1. Settings Normalization & Root Cadence Attributes
      ========================================================================== */
 
-  function normalizeFps(_raw) {
+  function normalizeFps(raw) {
+    if (raw === 12 || raw === '12') return '12';
+    if (raw === 24 || raw === '24') return '24';
     return 'native';
+  }
+
+  function getSteppedFpsIntervalMs(settingsOverride) {
+    return getFpsMode(settingsOverride) === '12' ? 83.33 : 41.67;
   }
 
   function normalizeSettings(settings) {
@@ -197,7 +222,7 @@
     const fpsMode = normalizeFps(s.animationFps);
     const cats = s.animationCategories;
 
-    const targets = [document.documentElement, document.getElementById('app')];
+    const targets = [document.documentElement, getAppEl()];
     for (const el of targets) {
       if (!el) continue;
       el.setAttribute('data-animations-enabled', anyEnabled ? 'true' : 'false');
@@ -209,6 +234,12 @@
       el.setAttribute('data-anim-reloadicon', cats.reloadIcon ? 'true' : 'false');
       el.setAttribute('data-anim-uimicro', cats.uiMicro ? 'true' : 'false');
       el.setAttribute('data-anim-pagetransitions', cats.pageTransitions ? 'true' : 'false');
+    }
+
+    if (typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+      try {
+        window.dispatchEvent(new CustomEvent('rrwr:animations-changed', { detail: s }));
+      } catch (_) {}
     }
 
     return s;
@@ -284,7 +315,7 @@
     return easeOutCubic(t);
   }
 
-  function animateStepped({ durationMs = 200, ease = easeOutCubic, onFrame, onComplete }) {
+  function animateStepped({ durationMs = 200, ease = easeOutCubic, stepCount = 0, onFrame, onComplete }) {
     let stopped = false;
     let rafId = null;
     let startTime = null;
@@ -294,7 +325,10 @@
       if (startTime === null) startTime = now;
       const elapsed = Math.max(0, now - startTime);
       const rawT = durationMs <= 0 ? 1 : Math.min(1, elapsed / durationMs);
-      const eased = rawT >= 1 ? 1 : ease(rawT);
+      const qt = (rawT < 1 && stepCount > 0)
+        ? Math.min(1, Math.floor(rawT * stepCount) / stepCount)
+        : rawT;
+      const eased = rawT >= 1 ? 1 : ease(qt);
 
       if (onFrame) onFrame(eased, rawT);
 
@@ -1214,24 +1248,111 @@
     }, 185);
   }
 
+  function nextWidgetToken(el, className) {
+    if (!el || !className) return 0;
+    let map = widgetClassTokens.get(el);
+    if (!map) {
+      map = new Map();
+      widgetClassTokens.set(el, map);
+    }
+    const next = (map.get(className) || 0) + 1;
+    map.set(className, next);
+    return next;
+  }
+
+  function isCurrentWidgetToken(el, className, token) {
+    if (!el || !className) return false;
+    const map = widgetClassTokens.get(el);
+    return Boolean(map && map.get(className) === token);
+  }
+
+  function clearSoundTestPulse(el, className) {
+    if (!el || !className) return;
+    nextWidgetToken(el, className);
+    el.classList.remove(className);
+  }
+
+  function isWidgetUiMicroAllowed() {
+    if (isReducedMotionPreferred()) return false;
+    const app = getAppEl();
+    if (app) {
+      if (app.getAttribute('data-animations-enabled') === 'false') return false;
+      if (app.getAttribute('data-anim-uimicro') === 'false') return false;
+      return true;
+    }
+    return isCategoryEnabled('uiMicro');
+  }
+
+  function isWidgetVisibilityAnimAllowed() {
+    if (isReducedMotionPreferred()) return false;
+    const app = getAppEl();
+    if (app) {
+      if (app.getAttribute('data-animations-enabled') === 'false') return false;
+      const uiMicro = app.getAttribute('data-anim-uimicro') !== 'false';
+      const menus = app.getAttribute('data-anim-menus') !== 'false';
+      return uiMicro || menus;
+    }
+    return isCategoryEnabled('uiMicro') || isCategoryEnabled('menus');
+  }
+
+  function triggerSoundTestPulse(el, className, durationMs = 200, options = {}) {
+    if (!hasDom() || !el || !className) return;
+    const allowed = options.allowMenus ? isWidgetVisibilityAnimAllowed() : isWidgetUiMicroAllowed();
+    if (!allowed) {
+      clearSoundTestPulse(el, className);
+      return;
+    }
+    const token = nextWidgetToken(el, className);
+    const retrigger = options.retrigger !== false;
+    if (retrigger) {
+      el.classList.remove(className);
+      void el.offsetWidth;
+    }
+    el.classList.add(className);
+    if (durationMs > 0) {
+      setTimeout(() => {
+        if (!isCurrentWidgetToken(el, className, token)) return;
+        if (el.isConnected) el.classList.remove(className);
+      }, durationMs);
+    }
+  }
+
   function setSoundTestVisible(barEl, visible) {
     if (!hasDom() || !barEl) return;
     const token = nextToken(barEl);
+    const canAnimate = isWidgetVisibilityAnimAllowed();
 
     if (visible) {
+      const wasHidden = barEl.classList.contains('hidden') || barEl.classList.contains('soundbar-closing');
       barEl.classList.remove('hidden', 'soundbar-closing');
-      if (isCategoryEnabled('uiMicro') || isCategoryEnabled('menus')) {
+      clearSoundTestPulse(barEl, 'is-minimizing');
+      clearSoundTestPulse(barEl, 'is-expanding');
+      clearSoundTestPulse(barEl, 'is-deck-recoil');
+      if (canAnimate && wasHidden) {
         barEl.classList.remove('soundbar-open');
         void barEl.offsetWidth;
         barEl.classList.add('soundbar-open');
-      } else {
-        barEl.classList.add('soundbar-open');
+        const led = barEl.querySelector('.soundTestLed');
+        if (led) {
+          triggerSoundTestPulse(led, 'is-led-igniting', 240);
+        }
+        setTimeout(() => {
+          if (!isCurrentToken(barEl, token)) return;
+          if (barEl.isConnected) barEl.classList.remove('soundbar-open');
+        }, 240);
+      } else if (!canAnimate) {
+        barEl.classList.remove('soundbar-open');
       }
       return;
     }
 
     barEl.classList.remove('soundbar-open', 'is-playing');
-    if ((!isCategoryEnabled('uiMicro') && !isCategoryEnabled('menus')) || barEl.classList.contains('hidden')) {
+    clearSoundTestPulse(barEl, 'is-minimizing');
+    clearSoundTestPulse(barEl, 'is-expanding');
+    clearSoundTestPulse(barEl, 'is-deck-recoil');
+    clearSoundTestPulse(barEl, 'is-eq-decaying');
+
+    if (!canAnimate || barEl.classList.contains('hidden')) {
       barEl.classList.remove('soundbar-closing');
       barEl.classList.add('hidden');
       return;
@@ -1242,12 +1363,77 @@
       if (!isCurrentToken(barEl, token)) return;
       barEl.classList.remove('soundbar-closing');
       barEl.classList.add('hidden');
-    }, 185);
+    }, 190);
+  }
+
+  function animateSoundTestMinimize(barEl, minimized) {
+    if (!hasDom() || !barEl) return;
+    const isMin = Boolean(minimized);
+    clearSoundTestPulse(barEl, isMin ? 'is-expanding' : 'is-minimizing');
+    triggerSoundTestPulse(
+      barEl,
+      isMin ? 'is-minimizing' : 'is-expanding',
+      isMin ? 215 : 235,
+      { allowMenus: true }
+    );
+  }
+
+  function setReopenPillVisible(btnEl, visible, options = {}) {
+    if (!hasDom() || !btnEl) return;
+    const token = nextToken(btnEl);
+    const delayMs = Math.max(0, Number(options && options.delayMs) || 0);
+    const canAnimate = isWidgetVisibilityAnimAllowed();
+
+    if (visible) {
+      const wasHidden = btnEl.classList.contains('hidden') || btnEl.classList.contains('reopen-closing');
+      if (!canAnimate) {
+        btnEl.classList.remove('hidden', 'reopen-closing', 'reopen-open');
+        return;
+      }
+      if (!wasHidden) {
+        btnEl.classList.remove('hidden', 'reopen-closing');
+        return;
+      }
+      const showNow = () => {
+        if (!isCurrentToken(btnEl, token) || !btnEl.isConnected) return;
+        btnEl.classList.remove('hidden', 'reopen-closing', 'reopen-open');
+        void btnEl.offsetWidth;
+        btnEl.classList.add('reopen-open');
+        setTimeout(() => {
+          if (!isCurrentToken(btnEl, token)) return;
+          if (btnEl.isConnected) btnEl.classList.remove('reopen-open');
+        }, 210);
+      };
+      if (delayMs > 0) {
+        setTimeout(showNow, delayMs);
+      } else {
+        showNow();
+      }
+      return;
+    }
+
+    btnEl.classList.remove('reopen-open');
+    if (!canAnimate || btnEl.classList.contains('hidden')) {
+      btnEl.classList.remove('reopen-closing');
+      btnEl.classList.add('hidden');
+      return;
+    }
+
+    btnEl.classList.add('reopen-closing');
+    setTimeout(() => {
+      if (!isCurrentToken(btnEl, token)) return;
+      btnEl.classList.remove('reopen-closing');
+      btnEl.classList.add('hidden');
+    }, 140);
   }
 
   function setSoundTestPlaying(barEl, playing) {
     if (!hasDom() || !barEl) return;
-    barEl.classList.toggle('is-playing', Boolean(playing));
+    const isPlaying = Boolean(playing);
+    barEl.classList.toggle('is-playing', isPlaying);
+    if (isPlaying) {
+      clearSoundTestPulse(barEl, 'is-eq-decaying');
+    }
   }
 
   function animateCollapsible(bodyEl, expand, options = {}) {
@@ -1656,6 +1842,8 @@
     isCategoryEnabled,
     hasAnyActiveAnimation,
     getFpsMode,
+    getSteppedFpsIntervalMs,
+    isReducedMotionPreferred,
     nextPaintFrame,
     animateStepped,
     flipElements,
@@ -1675,6 +1863,10 @@
     openLightbox,
     closeLightbox,
     setSoundTestVisible,
+    animateSoundTestMinimize,
+    setReopenPillVisible,
+    triggerSoundTestPulse,
+    clearSoundTestPulse,
     setSoundTestPlaying,
     animateCollapsible,
     beginModLoading,

@@ -186,31 +186,86 @@
       </div>
     </main>
 
-    <!-- Persistent Sound Test / Music Mini-Player Bar -->
-    <section id="sound-test-bar" class="soundTestBar hidden" aria-label="Sound Test Audio Player">
-      <div class="soundTestInfo">
-        <span class="soundTestEq" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
-        <div class="soundTestTextStack">
-          <span id="sound-test-title" class="soundTestTitle">No track loaded</span>
-          <span id="sound-test-meta" class="soundTestMeta"></span>
+    <!-- Snap Tether Overlay while dragging Floating MP3 Widget -->
+    <div id="sound-test-snap-overlay" class="soundTestSnapOverlay hidden" aria-hidden="true">
+      <svg id="sound-test-tether-svg" class="soundTestTetherSvg">
+        <path id="sound-test-tether-sub1" class="soundTestTetherSub" d=""></path>
+        <path id="sound-test-tether-sub2" class="soundTestTetherSub" d=""></path>
+        <path id="sound-test-tether-cross" class="soundTestTetherCross" d=""></path>
+        <path id="sound-test-tether-main" class="soundTestTetherMain" d=""></path>
+        <circle id="sound-test-tether-node" class="soundTestTetherNode" cx="0" cy="0" r="4.5"></circle>
+      </svg>
+      <div id="sound-test-dock-target" class="soundTestDockTarget">
+        <svg class="soundTestDockSvg" preserveAspectRatio="none">
+          <rect class="soundTestDockRect" x="1" y="1" width="calc(100% - 2px)" height="calc(100% - 2px)"></rect>
+        </svg>
+        <span class="soundTestDockCorner tl"></span>
+        <span class="soundTestDockCorner tr"></span>
+        <span class="soundTestDockCorner bl"></span>
+        <span class="soundTestDockCorner br"></span>
+      </div>
+      <div id="sound-test-corner-ripple" class="soundTestCornerRipple hidden"></div>
+    </div>
+
+    <!-- Floating Retro MP3 Player Widget (Draggable with Magnetic Corner Snap & Corner-Anchored Resize) -->
+    <section id="sound-test-bar" class="soundTestBar hidden" data-corner="bottom-right" data-size-tier="standard" aria-label="Sound Test Audio Player">
+      <svg class="soundTestCornerAnchorWeb" aria-hidden="true" viewBox="0 0 42 42" width="42" height="42">
+        <path class="soundTestAnchorFilament" d="M 42 42 L 8 39" />
+        <path class="soundTestAnchorFilament" d="M 42 42 L 15 15" />
+        <path class="soundTestAnchorFilament" d="M 42 42 L 39 8" />
+        <path class="soundTestAnchorBridge" d="M 15 38 Q 25 25 38 15" />
+      </svg>
+      <div id="sound-test-resize-grip" class="soundTestResizeGrip" role="separator" aria-label="Resize audio player" title="Drag to resize (double-click to reset)" tabindex="0"></div>
+
+      <div class="soundTestChassisHeader">
+        <div class="soundTestBrandGroup">
+          <span class="soundTestLed" aria-hidden="true"></span>
+          <span class="soundTestBrandLabel">MP3 DECK</span>
+          <span id="sound-test-mode-badge" class="soundTestModeBadge">SOUND</span>
+          <span id="sound-test-format-tag" class="soundTestFormatTag" aria-hidden="true"></span>
+        </div>
+        <div class="soundTestWinControls">
+          <button id="sound-test-minimize-btn" class="soundTestWinBtn" type="button" title="Minimize Player" aria-label="Minimize Audio Player" aria-expanded="true">_</button>
+          <button id="sound-test-close-btn" class="soundTestWinBtn soundTestCloseBtn" type="button" title="Hide Player" aria-label="Hide Audio Player">&times;</button>
         </div>
       </div>
-      <div class="soundTestControls">
+
+      <div class="soundTestLcdPanel">
+        <div id="sound-test-art-wrap" class="soundTestArtWrap hidden" aria-hidden="true">
+          <img id="sound-test-art" class="soundTestArtImg" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="" />
+        </div>
+        <div class="soundTestLcdReadout">
+          <div id="sound-test-title-viewport" class="soundTestTitleViewport">
+            <div id="sound-test-title" class="soundTestTitle" title="No track loaded">No track loaded</div>
+          </div>
+          <div id="sound-test-meta" class="soundTestMeta">--</div>
+          <div id="sound-test-artist-line" class="soundTestArtistLine"></div>
+          <div class="soundTestLcdStatus">
+            <span class="soundTestEq" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+            <div class="soundTestTimeGroup">
+              <span id="sound-test-current-time" class="soundTestTime">0:00</span>
+              <span class="soundTestTimeSep">/</span>
+              <span id="sound-test-duration" class="soundTestTime">0:00</span>
+              <span id="sound-test-remaining" class="soundTestRemainingTime" title="Remaining time"></span>
+            </div>
+            <span id="sound-test-progress-pct" class="soundTestProgressPct" aria-hidden="true">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="soundTestSeekRow">
+        <canvas id="sound-test-squiggly" class="soundTestSquigglyCanvas" width="284" height="22" tabindex="0" role="slider" aria-label="Seek track"></canvas>
+        <input id="sound-test-seek" type="range" class="soundTestSeekSlider" min="0" max="100" value="0" step="0.1" aria-label="Seek track" tabindex="-1" />
+      </div>
+
+      <div class="soundTestDeckControls">
         <div class="soundTestTransport">
-          <button id="sound-test-play-btn" class="soundTestBtn" title="Play / Pause">&#9654;</button>
-          <button id="sound-test-stop-btn" class="soundTestBtn" title="Stop">&#9632;</button>
+          <button id="sound-test-play-btn" class="soundTestBtn soundTestPlayBtn" type="button" title="Play / Pause" aria-label="Play / Pause"><span class="soundTestPlayGlyph">&#9654;</span></button>
+          <button id="sound-test-stop-btn" class="soundTestBtn" type="button" title="Stop / Reset" aria-label="Stop">&#9632;</button>
         </div>
-        <div class="soundTestSeekRow">
-          <span id="sound-test-current-time" class="soundTestTime">0:00</span>
-          <input id="sound-test-seek" type="range" class="soundTestSeekSlider" min="0" max="100" value="0" step="0.1" aria-label="Seek track" />
-          <span id="sound-test-duration" class="soundTestTime">0:00</span>
-        </div>
-        <audio id="sound-test-audio" preload="metadata"></audio>
-      </div>
-      <div class="soundTestRight">
         <div class="soundTestVolumeGroup">
-          <button id="sound-test-mute-btn" class="soundTestMuteBtn" title="Mute / Unmute" aria-label="Mute or unmute">
-            <svg id="sound-test-mute-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <button id="sound-test-mute-btn" class="soundTestBtn soundTestMuteBtn" type="button" title="Mute / Unmute" aria-label="Mute or unmute">
+            <svg id="sound-test-mute-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
               <path class="vol-wave-low" d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
               <path class="vol-wave-high" d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
@@ -221,9 +276,30 @@
           <input id="sound-test-volume" type="range" class="soundTestVolumeSlider" min="0" max="100" value="100" aria-label="Volume" />
           <span id="sound-test-volume-pct" class="soundTestVolPct">100%</span>
         </div>
-        <button id="sound-test-close-btn" class="soundTestCloseBtn" title="Close Player">&times;</button>
       </div>
+
+      <div class="soundTestMiniStrip">
+        <span class="soundTestEq soundTestMiniEq" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+        <span id="sound-test-mini-title" class="soundTestMiniTitle" title="No track loaded">No track loaded</span>
+        <div class="soundTestMiniActions">
+          <button id="sound-test-mini-play-btn" class="soundTestWinBtn soundTestMiniPlayBtn" type="button" title="Play / Pause" aria-label="Play / Pause"><span class="soundTestPlayGlyph">&#9654;</span></button>
+          <button id="sound-test-mini-expand-btn" class="soundTestWinBtn" type="button" title="Expand Player" aria-label="Expand Audio Player">+</button>
+          <button id="sound-test-mini-close-btn" class="soundTestWinBtn soundTestCloseBtn" type="button" title="Hide Player" aria-label="Hide Audio Player">&times;</button>
+        </div>
+      </div>
+
+      <audio id="sound-test-audio" preload="metadata"></audio>
     </section>
+
+    <!-- Floating Reopen Pill when page audio player is hidden -->
+    <button id="sound-test-reopen-btn" class="soundTestReopenBtn hidden" data-corner="bottom-right" type="button" title="Show Audio Player" aria-label="Show Audio Player">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 18V5l12-2v13"></path>
+        <circle cx="6" cy="18" r="3"></circle>
+        <circle cx="18" cy="16" r="3"></circle>
+      </svg>
+      <span>MP3 DECK</span>
+    </button>
 
     <!-- Floating Exit Page Fullscreen Control -->
     <button id="page-fullscreen-exit-btn" class="pageFullscreenExitBtn hidden" type="button" title="Exit Page Fullscreen (Esc / F11)" aria-label="Exit Page Fullscreen">Exit Fullscreen (Esc)</button>
@@ -264,6 +340,7 @@
   <script src="/js/animations.js"></script>
   <script src="/js/genericIcons.js"></script>
   <script src="/js/virtualController.js"></script>
+  <script src="/js/audioPlayerWidget.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/debugHud.js"></script>
 </body>
