@@ -3484,12 +3484,13 @@
       if (state.soundTest && state.soundTest.mode === 'pageAudio' && (state.soundTest.pageAudioEl || state.soundTest.pageAudioKind === 'ruffle')) {
         state.soundTest.pageAudioHiddenByUser = true;
         setBarVisibility(false);
-        setReopenPillVisibility(reopenBtn, true, { delayMs: 80 });
+        setReopenPillVisibility(reopenBtn, false);
         return;
       }
       if (audioEl) audioEl.pause();
       setBarPlayingState(false);
       setBarVisibility(false);
+      setReopenPillVisibility(reopenBtn, false);
     }
 
     addBarListener(playBtn, 'click', toggleBarPlayback);
@@ -3682,6 +3683,16 @@
       });
       addBarListener(window, 'rrwr:page-audio', (e) => {
         attachPageAudioToBar(e && e.detail ? e.detail : { active: false });
+      });
+      addBarListener(window, 'rrwr:reopen-sound-test', () => {
+        if (!state.soundTest) return;
+        const hasPageAudio = state.soundTest.mode === 'pageAudio' && (state.soundTest.pageAudioEl || state.soundTest.pageAudioKind === 'ruffle');
+        const hasAudioSrc = Boolean(audioEl && audioEl.getAttribute('src'));
+        if (state.soundTest.pageAudioHiddenByUser || hasPageAudio || hasAudioSrc) {
+          state.soundTest.pageAudioHiddenByUser = false;
+          setReopenPillVisibility(reopenBtn, false);
+          setBarVisibility(true);
+        }
       });
 
       addBarListener(window, 'message', (e) => {
@@ -3921,6 +3932,9 @@
       e.stopPropagation();
       const isHidden = popover.classList.contains('hidden');
       setPopoverOpen(isHidden);
+      if (isHidden) {
+        window.dispatchEvent(new CustomEvent('rrwr:reopen-sound-test'));
+      }
     });
 
     if (muteBtn) {
@@ -4564,6 +4578,34 @@
             <label for="setting-auto-show-audio-player">Auto-Show Audio Player on Pages with Sound:</label>
             <input type="checkbox" id="setting-auto-show-audio-player" ${settings.autoShowAudioPlayer !== false ? 'checked' : ''} />
           </div>
+          <div class="settingRow">
+            <label for="setting-audio-player-corner">MP3 Deck Dock Corner:</label>
+            <select id="setting-audio-player-corner">
+              <option value="bottom-right" ${(settings.audioPlayerCorner || 'bottom-right') === 'bottom-right' ? 'selected' : ''}>Bottom Right</option>
+              <option value="bottom-left" ${settings.audioPlayerCorner === 'bottom-left' ? 'selected' : ''}>Bottom Left</option>
+              <option value="top-right" ${settings.audioPlayerCorner === 'top-right' ? 'selected' : ''}>Top Right</option>
+              <option value="top-left" ${settings.audioPlayerCorner === 'top-left' ? 'selected' : ''}>Top Left</option>
+            </select>
+          </div>
+          <div class="settingRow">
+            <label for="setting-audio-player-minimized">Start MP3 Deck Minimized:</label>
+            <input type="checkbox" id="setting-audio-player-minimized" ${settings.audioPlayerMinimized ? 'checked' : ''} />
+          </div>
+          <div class="settingRow">
+            <label for="setting-audio-player-width">MP3 Deck Width (<span id="setting-audio-player-width-val">${settings.audioPlayerWidth || 280}px</span>):</label>
+            <input type="range" id="setting-audio-player-width" min="204" max="520" step="4" value="${settings.audioPlayerWidth || 280}" />
+          </div>
+          <div class="settingRow">
+            <label for="setting-audio-player-height">MP3 Deck Height (<span id="setting-audio-player-height-val">${settings.audioPlayerHeight || 168}px</span>):</label>
+            <input type="range" id="setting-audio-player-height" min="96" max="290" step="4" value="${settings.audioPlayerHeight || 168}" />
+          </div>
+          <div class="settingRow">
+            <label>MP3 Deck Actions:</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="systemButton" id="setting-audio-player-reset-size">Reset Size</button>
+              <button type="button" class="systemButton" id="setting-audio-player-toggle-now">Show / Hide Deck</button>
+            </div>
+          </div>
         </div>
 
         <!-- Section 3b: Virtual Controller (Mobile / Touch) -->
@@ -4861,6 +4903,84 @@
       autoShowAudioBox.addEventListener('change', (e) => {
         settings.autoShowAudioPlayer = e.target.checked;
         persistConfig();
+      });
+    }
+
+    const cornerSelect = container.querySelector('#setting-audio-player-corner');
+    if (cornerSelect) {
+      cornerSelect.addEventListener('change', (e) => {
+        settings.audioPlayerCorner = e.target.value;
+        const bar = document.getElementById('sound-test-bar');
+        if (bar) bar.setAttribute('data-corner', e.target.value);
+        persistConfig();
+      });
+    }
+
+    const minBox = container.querySelector('#setting-audio-player-minimized');
+    if (minBox) {
+      minBox.addEventListener('change', (e) => {
+        settings.audioPlayerMinimized = e.target.checked;
+        const bar = document.getElementById('sound-test-bar');
+        if (bar) bar.classList.toggle('soundTestBar--minimized', e.target.checked);
+        persistConfig();
+      });
+    }
+
+    const widthSlider = container.querySelector('#setting-audio-player-width');
+    const widthVal = container.querySelector('#setting-audio-player-width-val');
+    if (widthSlider) {
+      widthSlider.addEventListener('input', (e) => {
+        const w = Math.max(204, Math.min(520, Number(e.target.value) || 280));
+        settings.audioPlayerWidth = w;
+        if (widthVal) widthVal.textContent = `${w}px`;
+        const bar = document.getElementById('sound-test-bar');
+        if (bar) bar.style.width = `${w}px`;
+      });
+      widthSlider.addEventListener('change', () => persistConfig());
+    }
+
+    const heightSlider = container.querySelector('#setting-audio-player-height');
+    const heightVal = container.querySelector('#setting-audio-player-height-val');
+    if (heightSlider) {
+      heightSlider.addEventListener('input', (e) => {
+        const h = Math.max(96, Math.min(290, Number(e.target.value) || 168));
+        settings.audioPlayerHeight = h;
+        if (heightVal) heightVal.textContent = `${h}px`;
+        const bar = document.getElementById('sound-test-bar');
+        if (bar) bar.style.height = `${h}px`;
+      });
+      heightSlider.addEventListener('change', () => persistConfig());
+    }
+
+    const resetSizeBtn = container.querySelector('#setting-audio-player-reset-size');
+    if (resetSizeBtn) {
+      resetSizeBtn.addEventListener('click', () => {
+        delete settings.audioPlayerWidth;
+        delete settings.audioPlayerHeight;
+        if (widthSlider) widthSlider.value = '280';
+        if (widthVal) widthVal.textContent = '280px';
+        if (heightSlider) heightSlider.value = '168';
+        if (heightVal) heightVal.textContent = '168px';
+        const bar = document.getElementById('sound-test-bar');
+        if (bar) {
+          bar.style.width = '';
+          bar.style.height = '';
+        }
+        persistConfig();
+      });
+    }
+
+    const toggleNowBtn = container.querySelector('#setting-audio-player-toggle-now');
+    if (toggleNowBtn) {
+      toggleNowBtn.addEventListener('click', () => {
+        const bar = document.getElementById('sound-test-bar');
+        if (!bar) return;
+        if (bar.classList.contains('hidden')) {
+          window.dispatchEvent(new CustomEvent('rrwr:reopen-sound-test'));
+        } else {
+          const closeBtn = document.getElementById('sound-test-close-btn');
+          if (closeBtn) closeBtn.click();
+        }
       });
     }
 

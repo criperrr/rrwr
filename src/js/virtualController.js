@@ -419,18 +419,49 @@
       this.render();
     }
 
+    _animateToolbarStepped() {
+      if (!this.toolbarEl || !root.RRWRAnimations || typeof root.RRWRAnimations.animateStepped !== 'function') return;
+      if (typeof this._toolbarAnimCancel === 'function') {
+        this._toolbarAnimCancel();
+        this._toolbarAnimCancel = null;
+      }
+      const el = this.toolbarEl;
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(-6px) scale(0.96)';
+      this._toolbarAnimCancel = root.RRWRAnimations.animateStepped({
+        durationMs: 180,
+        stepCount: 6,
+        onFrame: (p) => {
+          el.style.opacity = String(p.toFixed(2));
+          const ty = (-6 * (1 - p)).toFixed(2);
+          const sc = (0.96 + 0.04 * p).toFixed(3);
+          el.style.transform = `translateY(${ty}px) scale(${sc})`;
+        },
+        onComplete: () => {
+          el.style.opacity = '';
+          el.style.transform = '';
+          this._toolbarAnimCancel = null;
+        }
+      });
+    }
+
     _updateVisibility() {
       if (!this.rootEl) return;
+      const wasVisible = !this.rootEl.classList.contains('hidden');
       const visible = this.isVisible();
       this.rootEl.classList.toggle('hidden', !visible);
+      const inSwfFullscreen = document.body.classList.contains('rrwr-swf-fullscreen');
       if (this.togglePillEl) {
-        const inSwfFullscreen = document.body.classList.contains('rrwr-swf-fullscreen');
         this.togglePillEl.classList.toggle('hidden', visible || !inSwfFullscreen || this.config.mode === 'off');
       }
       const addrBtn = document.getElementById('nav-controller-btn');
       if (addrBtn) {
+        addrBtn.classList.toggle('hidden', inSwfFullscreen);
         addrBtn.classList.toggle('active', visible);
         addrBtn.setAttribute('aria-pressed', visible ? 'true' : 'false');
+      }
+      if (!wasVisible && visible) {
+        this._animateToolbarStepped();
       }
     }
 
