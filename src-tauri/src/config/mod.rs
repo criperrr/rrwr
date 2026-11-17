@@ -493,6 +493,30 @@ pub struct AppSettings {
     pub open_logs: bool,
     #[serde(default = "default_true", alias = "hq_audio")]
     pub hq_audio: bool,
+    #[serde(default = "default_true", alias = "auto_show_audio_player")]
+    pub auto_show_audio_player: bool,
+    #[serde(
+        default = "default_audio_player_corner",
+        deserialize_with = "deserialize_audio_player_corner",
+        alias = "audio_player_corner"
+    )]
+    pub audio_player_corner: String,
+    #[serde(default, alias = "audio_player_minimized")]
+    pub audio_player_minimized: bool,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_audio_player_width",
+        alias = "audio_player_width"
+    )]
+    pub audio_player_width: Option<u32>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_audio_player_height",
+        alias = "audio_player_height"
+    )]
+    pub audio_player_height: Option<u32>,
     #[serde(default = "default_true", alias = "media_expand_button")]
     pub media_expand_button: bool,
     #[serde(default = "default_true", alias = "panel_fill_width")]
@@ -597,6 +621,54 @@ where
 fn default_theme() -> String {
     "default".to_string()
 }
+fn default_audio_player_corner() -> String {
+    "bottom-right".to_string()
+}
+fn deserialize_audio_player_corner<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = Option::<String>::deserialize(deserializer)?;
+    let normalized = raw
+        .as_deref()
+        .map(|s| s.trim().to_ascii_lowercase())
+        .unwrap_or_default();
+    match normalized.as_str() {
+        "top-left" | "top-right" | "bottom-left" | "bottom-right" => Ok(normalized),
+        "left" => Ok("bottom-left".to_string()),
+        "right" => Ok("bottom-right".to_string()),
+        _ => Ok(default_audio_player_corner()),
+    }
+}
+fn deserialize_optional_clamped_u32<'de, D>(
+    deserializer: D,
+    min: u32,
+    max: u32,
+) -> Result<Option<u32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = Option::<f64>::deserialize(deserializer)?;
+    Ok(raw.and_then(|v| {
+        if v.is_finite() {
+            Some((v.round() as i64).clamp(min as i64, max as i64) as u32)
+        } else {
+            None
+        }
+    }))
+}
+fn deserialize_audio_player_width<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    deserialize_optional_clamped_u32(deserializer, 204, 520)
+}
+fn deserialize_audio_player_height<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    deserialize_optional_clamped_u32(deserializer, 96, 290)
+}
 
 impl Default for AppSettings {
     fn default() -> Self {
@@ -627,6 +699,11 @@ impl Default for AppSettings {
             arrow_nav: true,
             open_logs: false,
             hq_audio: true,
+            auto_show_audio_player: true,
+            audio_player_corner: default_audio_player_corner(),
+            audio_player_minimized: false,
+            audio_player_width: None,
+            audio_player_height: None,
             media_expand_button: true,
             panel_fill_width: true,
             media_viewer_gestures: true,
@@ -1093,5 +1170,23 @@ mod tests {
         let neg_json = r#"{"masterVolume": -0.8}"#;
         let neg_settings: AppSettings = serde_json::from_str(neg_json).unwrap();
         assert!((neg_settings.master_volume - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_audio_player_size_defaults_aliases_and_clamping() {
+        let legacy: AppSettings = serde_json::from_str("{}").unwrap();
+        assert_eq!(legacy.audio_player_width, None);
+        assert_eq!(legacy.audio_player_height, None);
+
+        let camel: AppSettings =
+            serde_json::from_str(r#"{"audioPlayerWidth": 420, "audioPlayerHeight": 230}"#).unwrap();
+        assert_eq!(camel.audio_player_width, Some(420));
+        assert_eq!(camel.audio_player_height, Some(230));
+
+        let snake_clamped: AppSettings =
+            serde_json::from_str(r#"{"audio_player_width": 999, "audio_player_height": 12}"#)
+                .unwrap();
+        assert_eq!(snake_clamped.audio_player_width, Some(520));
+        assert_eq!(snake_clamped.audio_player_height, Some(96));
     }
 }

@@ -204,6 +204,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_app_info,
             commands::pick_asset_pack,
+            commands::pick_and_import_asset_pack_zip,
+            commands::pick_and_import_mod_zip,
+            commands::list_asset_packs,
             commands::check_asset_pack_path,
             commands::configure_asset_pack,
             commands::set_asset_pack_path,
