@@ -73,6 +73,63 @@ pub fn custom_asset_dir() -> PathBuf {
         .join("custom-assets")
 }
 
+pub fn managed_asset_packs_dir(app_data_dir: &Path) -> PathBuf {
+    app_data_dir.join("asset_packs")
+}
+
+pub fn import_asset_pack_zip(source: &Path, packs_dir: &Path) -> Result<PathBuf, String> {
+    let source = source
+        .canonicalize()
+        .map_err(|error| format!("Could not open selected archive: {error}"))?;
+    if !source
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("zip"))
+    {
+        return Err("Choose a .zip archive.".to_string());
+    }
+    let staging = tempfile::tempdir().map_err(|error| error.to_string())?;
+    extract_zip(&source, staging.path())?;
+    let root = find_asset_root(staging.path()).unwrap_or_else(|| staging.path().to_path_buf());
+    if !is_asset_pack(&root) {
+        return Err("No valid asset pack was found in the selected .zip.".to_string());
+    }
+    fs::create_dir_all(packs_dir).map_err(|error| error.to_string())?;
+    let base_name = source
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .map(safe_name)
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "asset-pack".to_string());
+    let target = unique_target(packs_dir, &base_name);
+    copy_tree(&root, &target).map_err(|error| format!("Could not import asset pack: {error}"))?;
+    Ok(target)
+}
+
+pub fn list_managed_asset_packs(
+    packs_dir: &Path,
+    active_dir: &Path,
+) -> Vec<(String, String, bool)> {
+    let mut packs = Vec::new();
+    let Ok(entries) = fs::read_dir(packs_dir) else {
+        return packs;
+    };
+    let active_canon = active_dir.canonicalize().ok();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() || !is_asset_pack(&path) {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let is_active = active_canon
+            .as_ref()
+            .is_some_and(|ac| path.canonicalize().ok().as_ref() == Some(ac))
+            || path == active_dir;
+        packs.push((name, path.to_string_lossy().into_owned(), is_active));
+    }
+    packs.sort_by(|a, b| a.0.cmp(&b.0));
+    packs
+}
+
 pub fn validate_asset_pack(path: &Path) -> Result<PathBuf, String> {
     let candidate = if path.exists() {
         path.canonicalize().unwrap_or_else(|_| path.to_path_buf())

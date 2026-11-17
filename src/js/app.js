@@ -4421,6 +4421,7 @@
           <p>${assetPackReady ? 'Asset Pack V2 is connected.' : 'The app needs the extracted Asset Pack V2 folder before the collection can load.'}</p>
           <p class="assetLocation"><strong>Asset Pack:</strong> ${escapeHtml((state.appInfo && state.appInfo.asset_dir) || 'not selected')}<br><strong>Custom asset overlay:</strong> ${escapeHtml((state.appInfo && state.appInfo.custom_asset_dir) || 'available after import')}</p>
           <div class="assetSetupActions">
+            <button type="button" id="import-asset-pack-zip">Import Asset Pack (.zip)</button>
             ${isAndroid ? `
               <button type="button" id="import-mod-zip" ${assetPackReady ? '' : 'disabled'}>Import mod ZIP</button>
               <button type="button" id="import-assets-zip">Import assets ZIP</button>
@@ -4432,6 +4433,7 @@
               <button type="button" id="import-assets-zip">Import assets ZIP</button>
             `}
           </div>
+          <div id="managed-asset-packs-list" class="modsList" style="margin-top:10px;"></div>
           ${isAndroid ? renderAndroidAssetSectionHtml((state.appInfo && state.appInfo.asset_dir) || '') : ''}
           <p id="asset-import-status" class="assetImportStatus" role="status" aria-live="polite"></p>
           <p class="assetSetupHelp">${isAndroid ? 'Select or enter the extracted Asset Pack V2 folder. Mods and custom assets can be imported from ZIP archives.' : 'Choose the already extracted Asset Pack V2 folder. The app keeps it untouched; imported replacement files live in a separate overlay. Mods can be imported from a folder or a ZIP archive.'}</p>
@@ -5220,22 +5222,66 @@
   }
 
   function bindAssetSetupActions(container) {
+    const refreshManagedPacks = async () => {
+      const listEl = container.querySelector('#managed-asset-packs-list');
+      if (!listEl) return;
+      try {
+        const packs = await ipcInvoke('list_asset_packs');
+        if (!Array.isArray(packs) || packs.length === 0) {
+          listEl.innerHTML = '';
+          return;
+        }
+        listEl.innerHTML = packs.map((pack) => `
+          <label class="modRow" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="radio" name="active-asset-pack" value="${escapeHtml(pack.path)}" ${pack.active ? 'checked' : ''} />
+            <span><strong>${escapeHtml(pack.name)}</strong></span>
+          </label>
+        `).join('');
+        listEl.querySelectorAll('input[name="active-asset-pack"]').forEach((radio) => {
+          radio.addEventListener('change', async (e) => {
+            if (!e.target.checked) return;
+            try {
+              setAssetImportStatus(container, 'Switching Asset Pack and reloading…');
+              await ipcInvoke('configure_asset_pack', { path: e.target.value });
+              state.appInfo = await ipcInvoke('get_app_info');
+              if (state.appInfo && state.appInfo.asset_pack_ready) {
+                await initApp();
+              }
+            } catch (error) {
+              setAssetImportStatus(container, String(error), true);
+            }
+          });
+        });
+      } catch (_) {}
+    };
+    refreshManagedPacks();
+
+    const handleImportAssetPackZip = async () => {
+      try {
+        setAssetImportStatus(container, 'Select the Asset Pack .zip file…');
+        const selected = await ipcInvoke('pick_and_import_asset_pack_zip');
+        if (!selected) {
+          setAssetImportStatus(container, '');
+          return;
+        }
+        setAssetImportStatus(container, 'Asset Pack imported! Reloading…');
+        state.appInfo = await ipcInvoke('get_app_info');
+        if (state.appInfo && state.appInfo.asset_pack_ready) {
+          await initApp();
+        }
+      } catch (error) {
+        setAssetImportStatus(container, String(error), true);
+      }
+    };
+
+    const importPackZipBtn = container.querySelector('#import-asset-pack-zip');
+    if (importPackZipBtn) {
+      importPackZipBtn.addEventListener('click', handleImportAssetPackZip);
+    }
+
     const choosePack = container.querySelector('#choose-asset-pack');
     if (choosePack) {
-      choosePack.addEventListener('click', async () => {
-        try {
-          const selected = await ipcInvoke('pick_asset_pack');
-          if (!selected) return;
-          setAssetImportStatus(container, 'Checking the Asset Pack and reloading…');
-          await ipcInvoke('configure_asset_pack', { path: selected });
-          state.appInfo = await ipcInvoke('get_app_info');
-          if (state.appInfo && state.appInfo.asset_pack_ready) {
-            await initApp();
-          }
-        } catch (error) {
-          setAssetImportStatus(container, String(error), true);
-        }
-      });
+      choosePack.addEventListener('click', handleImportAssetPackZip);
     }
 
     const importButton = (selector, kind, command, resultLabel) => {
