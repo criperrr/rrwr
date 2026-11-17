@@ -1236,7 +1236,7 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_connect_discord_socket_skips_dead_and_connects_to_sandboxed_serein() {
-        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_dir = tempfile::tempdir_in("/tmp").unwrap();
 
         // 1. Create a dead/stale socket directly under the root dir (simulating dead socket on host)
         let dead_sock = temp_dir.path().join("discord-ipc-0");
