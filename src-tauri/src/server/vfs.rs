@@ -483,12 +483,16 @@ mod tests {
 
         // Before mod overlay: both resolve to base
         assert_eq!(
-            vfs.resolve("/media/chapter1/00001.gif").await,
-            Some(base_file.clone())
+            vfs.resolve("/media/chapter1/00001.gif")
+                .await
+                .map(|p| std::fs::canonicalize(p).unwrap()),
+            Some(std::fs::canonicalize(&base_file).unwrap())
         );
         assert_eq!(
-            vfs.resolve("/media/chapter1/00002.gif").await,
-            Some(base_file2.clone())
+            vfs.resolve("/media/chapter1/00002.gif")
+                .await
+                .map(|p| std::fs::canonicalize(p).unwrap()),
+            Some(std::fs::canonicalize(&base_file2).unwrap())
         );
 
         // Add mod overlay
@@ -507,20 +511,26 @@ mod tests {
 
         // After overlay: 00001.gif is base, 00002.gif is overridden by mod
         assert_eq!(
-            vfs.resolve("/media/chapter1/00001.gif").await,
-            Some(base_file.clone())
+            vfs.resolve("/media/chapter1/00001.gif")
+                .await
+                .map(|p| std::fs::canonicalize(p).unwrap()),
+            Some(std::fs::canonicalize(&base_file).unwrap())
         );
         assert_eq!(
-            vfs.resolve("/media/chapter1/00002.gif").await,
-            Some(mod_file2.clone())
+            vfs.resolve("/media/chapter1/00002.gif")
+                .await
+                .map(|p| std::fs::canonicalize(p).unwrap()),
+            Some(std::fs::canonicalize(&mod_file2).unwrap())
         );
 
         // Clearing overlay restores base
         vfs.rebuild_overlay(vec![]).await.unwrap();
         assert_eq!(vfs.generation(), 3);
         assert_eq!(
-            vfs.resolve("/media/chapter1/00002.gif").await,
-            Some(base_file2)
+            vfs.resolve("/media/chapter1/00002.gif")
+                .await
+                .map(|p| std::fs::canonicalize(p).unwrap()),
+            Some(std::fs::canonicalize(&base_file2).unwrap())
         );
     }
 }
