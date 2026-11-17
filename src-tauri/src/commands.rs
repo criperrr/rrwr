@@ -346,6 +346,98 @@ pub async fn import_custom_assets(
 }
 
 #[tauri::command]
+pub async fn pick_and_import_asset_pack_zip(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    use tauri::Manager;
+    use tauri_plugin_dialog::DialogExt;
+    let app_for_pick = app.clone();
+    let picked = tokio::task::spawn_blocking(move || {
+        app_for_pick
+            .dialog()
+            .file()
+            .add_filter("ZIP Archive", &["zip"])
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let Some(file_path) = picked else {
+        return Ok(None);
+    };
+    let zip_path = file_path
+        .into_path()
+        .map_err(|e| format!("Invalid file path: {e}"))?;
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Could not resolve app data dir: {e}"))?;
+    let packs_dir = crate::imports::managed_asset_packs_dir(&app_data_dir);
+    let target = tokio::task::spawn_blocking(move || {
+        crate::imports::import_asset_pack_zip(&zip_path, &packs_dir)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+
+    let target_str = target.to_string_lossy().into_owned();
+    configure_asset_pack(app, state, target_str.clone()).await?;
+    Ok(Some(target_str))
+}
+
+#[tauri::command]
+pub async fn pick_and_import_mod_zip(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let app_for_pick = app.clone();
+    let picked = tokio::task::spawn_blocking(move || {
+        app_for_pick
+            .dialog()
+            .file()
+            .add_filter("ZIP Archive", &["zip"])
+            .blocking_pick_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let Some(file_path) = picked else {
+        return Ok(Vec::new());
+    };
+    let zip_path = file_path
+        .into_path()
+        .map_err(|e| format!("Invalid file path: {e}"))?;
+    let mods_dir = state.0.asset_dir().join("mods");
+    let installed =
+        tokio::task::spawn_blocking(move || crate::imports::import_mod(&zip_path, &mods_dir))
+            .await
+            .map_err(|e| e.to_string())??;
+    refresh_mod_runtime(&state).await?;
+    state.0.vfs.bump_generation();
+    Ok(installed)
+}
+
+#[tauri::command]
+pub async fn list_asset_packs(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<serde_json::Value>, String> {
+    use tauri::Manager;
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Could not resolve app data dir: {e}"))?;
+    let packs_dir = crate::imports::managed_asset_packs_dir(&app_data_dir);
+    let active_dir = state.0.asset_dir();
+    let packs = crate::imports::list_managed_asset_packs(&packs_dir, &active_dir);
+    Ok(packs
+        .into_iter()
+        .map(|(name, path, active)| serde_json::json!({ "name": name, "path": path, "active": active }))
+        .collect())
+}
+
+#[tauri::command]
 pub async fn get_story_page(
     state: tauri::State<'_, AppState>,
     page_id: String,

@@ -7,19 +7,20 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Release tag (e.g. v2.8.1)"
+        description: "Release tag (e.g. v2.8.2)"
         required: false
         default: ""
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-rrwr
+  group: release-rrwr-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  build_release:
+  build_linux:
     name: Build & Package Desktop Release (Linux x86_64)
     runs-on: ubuntu-22.04
     timeout-minutes: 45
@@ -78,12 +79,12 @@ jobs:
           python3 tests/e2e_runner.py
           python3 .agents/scripts/memory_check.py
 
-      - name: Build Tauri Desktop Bundles
-        run: npx tauri build
+      - name: Build Tauri Linux Bundles
+        run: npx tauri build --bundles deb,rpm,appimage
 
-      - name: Collect Release Artifacts
-        id: collect_artifacts
+      - name: Collect Linux Release Artifacts
         run: |
+          set -e
           mkdir -p release_assets
           find target/release/bundle -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" \) -exec cp {} release_assets/ \;
           mkdir -p release_assets/rrwr-linux-x86_64/usr/bin release_assets/rrwr-linux-x86_64/usr/share/applications release_assets/rrwr-linux-x86_64/usr/share/icons/hicolor/256x256/apps
@@ -92,15 +93,163 @@ jobs:
           install -m 644 src-tauri/icons/icon.png release_assets/rrwr-linux-x86_64/usr/share/icons/hicolor/256x256/apps/rrwr.png
           version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' src-tauri/Cargo.toml | head -n1)"
           tar -C release_assets -czf "release_assets/rrwr-${version}-linux-x86_64.tar.gz" rrwr-linux-x86_64
-          sha256sum "release_assets/rrwr-${version}-linux-x86_64.tar.gz" > "release_assets/rrwr-${version}-linux-x86_64.tar.gz.sha256"
           rm -rf release_assets/rrwr-linux-x86_64
+          (cd release_assets && sha256sum "rrwr-${version}-linux-x86_64.tar.gz" > "rrwr-${version}-linux-x86_64.tar.gz.sha256")
           ls -la release_assets/
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-linux
+          path: release_assets/*
+          if-no-files-found: error
+
+  build_windows:
+    name: Build & Package Desktop Release (Windows x86_64)
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo Dependencies
+        uses: swatinem/rust-cache@v2
+
+      - name: Setup Node.js for prebuilt Tauri CLI
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install locked npm dependencies
+        run: npm ci
+
+      - name: Validate Rust Unit Tests
+        run: cargo test
+
+      - name: Build Tauri Windows Bundles (.msi & NSIS .exe)
+        run: npx tauri build --bundles msi,nsis
+
+      - name: Collect Windows Release Artifacts
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path "release_assets" | Out-Null
+          Get-ChildItem -Path "target\release\bundle" -Recurse -Include "*.msi", "*-setup.exe" | ForEach-Object {
+            Copy-Item $_.FullName -Destination "release_assets\" -Force
+          }
+          $cargoToml = Get-Content "src-tauri\Cargo.toml" -Raw
+          if ($cargoToml -match 'version\s*=\s*"([^"]+)"') {
+            $version = $Matches[1]
+          } else {
+            $version = "latest"
+          }
+          Compress-Archive -Path "target\release\rrwr.exe" -DestinationPath "release_assets\rrwr-$version-windows-x86_64.zip" -Force
+          $checksumLines = Get-ChildItem -Path "release_assets" -File | ForEach-Object {
+            $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          }
+          $checksumLines | Set-Content -Path "release_assets\rrwr-$version-windows-x86_64.sha256" -Encoding Ascii
+          Get-ChildItem "release_assets"
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-windows
+          path: release_assets/*
+          if-no-files-found: error
+
+  build_macos:
+    name: Build & Package Desktop Release (macOS ${{ matrix.label }})
+    runs-on: macos-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            arch: aarch64
+            label: Apple Silicon
+          - target: x86_64-apple-darwin
+            arch: x86_64
+            label: Intel
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Cargo Dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Setup Node.js for prebuilt Tauri CLI
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install locked npm dependencies
+        run: npm ci
+
+      - name: Validate Rust Unit Tests
+        if: matrix.target == 'aarch64-apple-darwin'
+        run: cargo test
+
+      - name: Build Tauri macOS Bundles (.app & .dmg)
+        run: npx tauri build --target ${{ matrix.target }} --bundles app,dmg
+
+      - name: Collect macOS Release Artifacts
+        run: |
+          set -e
+          mkdir -p release_assets
+          find "target/${{ matrix.target }}/release/bundle/dmg" -type f -name "*.dmg" -exec cp {} release_assets/ \;
+          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' src-tauri/Cargo.toml | head -n1)"
+          tar -C "target/${{ matrix.target }}/release/bundle/macos" -czf "release_assets/rrwr-${version}-macos-${{ matrix.arch }}.app.tar.gz" RRWR.app
+          (cd release_assets && shasum -a 256 * > "rrwr-${version}-macos-${{ matrix.arch }}.sha256")
+          ls -la release_assets/
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-macos-${{ matrix.arch }}
+          path: release_assets/*
+          if-no-files-found: error
+
+  publish_release:
+    name: Publish GitHub Release
+    needs: [build_linux, build_windows, build_macos]
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.tag_name != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Download All Release Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_assets
+          merge-multiple: true
+
+      - name: List Release Assets
+        run: ls -la release_assets/
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.tag_name != ''
         with:
-          tag_name: ${{ github.ref_name || inputs.tag_name }}
+          tag_name: ${{ inputs.tag_name != '' && inputs.tag_name || github.ref_name }}
           files: release_assets/*
           generate_release_notes: true
           draft: false
