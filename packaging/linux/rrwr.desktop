@@ -6,4 +6,4 @@ Icon=rrwr
 Terminal=false
 Type=Application
 Categories=Game;Utility;
-StartupWMClass=com.rrwr.app
+StartupWMClass=rrwr

@@ -90,7 +90,7 @@ jobs:
           mkdir -p release_assets/rrwr-linux-x86_64/usr/bin release_assets/rrwr-linux-x86_64/usr/share/applications release_assets/rrwr-linux-x86_64/usr/share/icons/hicolor/256x256/apps
           install -m 755 target/release/rrwr release_assets/rrwr-linux-x86_64/usr/bin/rrwr
           install -m 644 packaging/linux/rrwr.desktop release_assets/rrwr-linux-x86_64/usr/share/applications/rrwr.desktop
-          install -m 644 src-tauri/icons/icon.png release_assets/rrwr-linux-x86_64/usr/share/icons/hicolor/256x256/apps/rrwr.png
+          install -m 644 src-tauri/icons/256x256.png release_assets/rrwr-linux-x86_64/usr/share/icons/hicolor/256x256/apps/rrwr.png
           version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' src-tauri/Cargo.toml | head -n1)"
           tar -C release_assets -czf "release_assets/rrwr-${version}-linux-x86_64.tar.gz" rrwr-linux-x86_64
           rm -rf release_assets/rrwr-linux-x86_64
