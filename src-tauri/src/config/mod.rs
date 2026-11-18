@@ -947,6 +947,12 @@ impl AppConfig {
 
     pub fn save(&self) -> Result<(), std::io::Error> {
         use std::io::Write;
+        static SAVE_LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+        let _guard = SAVE_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+
         let path = Self::config_path();
         let parent = path.parent().ok_or_else(|| {
             std::io::Error::new(std::io::ErrorKind::NotFound, "Missing parent directory")
@@ -966,9 +972,19 @@ impl AppConfig {
             if temp_file.write_all(json_str.as_bytes()).is_ok()
                 && temp_file.flush().is_ok()
                 && temp_file.as_file().sync_all().is_ok()
-                && temp_file.persist(&path).is_ok()
             {
-                return Ok(());
+                let mut pending = temp_file;
+                for attempt in 0..16 {
+                    match pending.persist(&path) {
+                        Ok(_) => return Ok(()),
+                        Err(err) => {
+                            pending = err.file;
+                            if attempt < 15 {
+                                std::thread::sleep(std::time::Duration::from_millis(2));
+                            }
+                        }
+                    }
+                }
             }
         }
 

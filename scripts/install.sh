@@ -17,18 +17,54 @@ for arg in "$@"; do
     esac
 done
 
+if [ -z "${NO_COLOR:-}" ] && { [ -t 1 ] || [ "${FORCE_COLOR:-0}" = "1" ]; }; then
+    C_RESET='\033[0m'
+    C_BOLD='\033[1m'
+    C_DIM='\033[2m'
+    C_CYAN='\033[36m'
+    C_GREEN='\033[32m'
+    C_YELLOW='\033[33m'
+    C_BLUE='\033[34m'
+else
+    C_RESET=''
+    C_BOLD=''
+    C_DIM=''
+    C_CYAN=''
+    C_GREEN=''
+    C_YELLOW=''
+    C_BLUE=''
+fi
+
+printf '%b' "${C_CYAN}${C_BOLD}"
+cat <<'BANNER'
++------------------------------------------------------------------------------+
+|  ____  ____  __        ______    _           _        _ _                    |
+| |  _ \|  _ \ \ \      / /  _ \  (_)_ __  ___| |_ __ _| | | ___ _ __          |
+| | |_) | |_) | \ \ /\ / /| |_) | | | '_ \/ __| __/ _` | | |/ _ \ '__|         |
+| |  _ <|  _ <   \ V  V / |  _ <  | | | | \__ \ || (_| | | |  __/ |            |
+| |_| \_\_| \_\   \_/\_/  |_| \_\ |_|_| |_|___/\__\__,_|_|_|\___|_|            |
+|                                                                              |
+|  RRWR - Rust-Ruffle WebComic Reader // Linux Installer                       |
++------------------------------------------------------------------------------+
+BANNER
+printf '%b\n' "${C_RESET}"
+
 info() {
-    printf '==> [INFO] %s\n' "$*"
+    printf '%b[*]%b %s\n' "${C_BLUE}${C_BOLD}" "${C_RESET}" "$*"
+}
+
+ok() {
+    printf '%b[OK]%b %s\n' "${C_GREEN}${C_BOLD}" "${C_RESET}" "$*"
 }
 
 notice() {
-    printf '==> [NOTICE] %s\n' "$*"
+    printf '%b[!]%b %s\n' "${C_YELLOW}${C_BOLD}" "${C_RESET}" "$*"
 }
 
 step() {
-    printf '\n================================================================================\n'
-    printf '==> %s\n' "$*"
-    printf '================================================================================\n'
+    printf '\n%b================================================================================%b\n' "${C_CYAN}" "${C_RESET}"
+    printf '%b[+] %s%b\n' "${C_CYAN}${C_BOLD}" "$*" "${C_RESET}"
+    printf '%b================================================================================%b\n' "${C_CYAN}" "${C_RESET}"
 }
 
 step "Step 1/6: Detecting System Environment & Permissions"
@@ -386,14 +422,14 @@ info "  - $ICON_DIR/$APP_NAME.png"
 info "  - $PIXMAP_DIR/$APP_NAME.png"
 
 step "Step 5/6: Registering Desktop Launcher & Shortcuts (GNOME, KDE, Hyprland, Sway, X11, Wayland)"
-notice "Configuring WEBKIT_DISABLE_DMABUF_RENDERER=1 in the launcher to prevent Wayland/Hyprland GBM buffer issues and reduce WebKitGTK RAM consumption by >50%."
+info "Using native GPU DMA-BUF compositing by default (override with WEBKIT_DISABLE_DMABUF_RENDERER=1 only if needed)."
 
 DESKTOP_FILE_CONTENT="[Desktop Entry]
 Type=Application
 Name=$DISPLAY_NAME
 GenericName=Archive Reader
 Comment=Lightweight Desktop Archive Reader & Media Player
-Exec=env WEBKIT_DISABLE_DMABUF_RENDERER=1 \"$INSTALL_DIR/$APP_NAME\" %U
+Exec=\"$INSTALL_DIR/$APP_NAME\" %U
 TryExec=$INSTALL_DIR/$APP_NAME
 Icon=$APP_NAME
 Terminal=false
@@ -463,7 +499,7 @@ case ":$PATH:" in
         ;;
 esac
 
-info "Installation complete! Mode: $INSTALLED_MODE"
-info "Executable : $INSTALL_DIR/$APP_NAME"
-info "Launcher   : $DESKTOP_DIR/$APP_NAME.desktop"
+ok "Installation complete! Mode: $INSTALLED_MODE"
+ok "Executable : $INSTALL_DIR/$APP_NAME"
+ok "Launcher   : $DESKTOP_DIR/$APP_NAME.desktop"
 info "You can now launch $DISPLAY_NAME from your application menu or by running: $INSTALL_DIR/$APP_NAME"

@@ -4306,8 +4306,115 @@
       console.warn('[RRWR-Settings] Could not fetch mods:', e);
     }
 
+    let managedPacks = [];
+    try {
+      const listed = await ipcInvoke('list_asset_packs');
+      managedPacks = Array.isArray(listed) ? listed : [];
+    } catch (_) {}
+
     const cfg = state.config;
     const settings = cfg.settings;
+    if (!Array.isArray(settings.knownAssetPacks)) {
+      settings.knownAssetPacks = [];
+    }
+
+    const activeAssetDir = (state.appInfo && state.appInfo.asset_dir) ? String(state.appInfo.asset_dir).trim() : '';
+    const assetPackReady = Boolean(state.appInfo && state.appInfo.asset_pack_ready);
+    const packMap = new Map();
+    const upsertPack = (packPath, name, source, isActive) => {
+      const cleanPath = String(packPath || '').trim();
+      if (!cleanPath) return;
+      const existing = packMap.get(cleanPath);
+      const fallbackName = cleanPath.split(/[\\/]/).filter(Boolean).pop() || cleanPath;
+      packMap.set(cleanPath, {
+        path: cleanPath,
+        name: (name && String(name).trim()) || (existing && existing.name) || fallbackName,
+        source: source || (existing && existing.source) || 'Local Folder',
+        active: Boolean(isActive || (existing && existing.active) || (assetPackReady && activeAssetDir === cleanPath))
+      });
+    };
+
+    managedPacks.forEach((p) => upsertPack(p.path, p.name, 'Managed Library', p.active));
+    settings.knownAssetPacks.forEach((p) => upsertPack(p.path, p.name, p.source || 'Local Folder', false));
+    if (assetPackReady && activeAssetDir) {
+      upsertPack(activeAssetDir, null, 'Local Folder', true);
+    }
+
+    const allAssetPacks = Array.from(packMap.values());
+    const pendingPackPath = (state.pendingAssetPackPath && state.pendingAssetPackPath !== activeAssetDir)
+      ? state.pendingAssetPackPath
+      : null;
+    if (!pendingPackPath) {
+      state.pendingAssetPackPath = null;
+    }
+
+    const activeAssetPacks = [];
+    const availableAssetPacks = [];
+    allAssetPacks.forEach((pack) => {
+      if (pack.active) {
+        activeAssetPacks.push(pack);
+      } else {
+        availableAssetPacks.push(pack);
+      }
+    });
+    availableAssetPacks.sort((a, b) => a.name.localeCompare(b.name));
+
+    const pendingPackObj = pendingPackPath ? packMap.get(pendingPackPath) : null;
+    const pendingPackSummary = pendingPackObj ? `Switch to ${pendingPackObj.name}` : '';
+
+    const renderAssetPackCardHtml = (pack) => {
+      const isSaved = pack.active;
+      const isEffective = pendingPackPath ? (pendingPackPath === pack.path) : isSaved;
+      const stagedClass = (!isSaved && isEffective)
+        ? 'modCard--staged-enable'
+        : ((isSaved && !isEffective) ? 'modCard--staged-disable' : '');
+      const stagedLabel = (!isSaved && isEffective)
+        ? '<span class="modStagedBadge modStagedBadge--enable">PENDING ON</span>'
+        : ((isSaved && !isEffective) ? '<span class="modStagedBadge modStagedBadge--disable">PENDING OFF</span>' : '<span class="modStagedBadge hidden"></span>');
+      const isExpanded = state.expandedAssetPacks && state.expandedAssetPacks.has(pack.path);
+      return `
+        <div class="modCard ${isExpanded ? 'expanded' : 'collapsed'} ${stagedClass}" data-pack-path="${escapeHtml(pack.path)}">
+          <div class="modCardHeader" data-pack-path="${escapeHtml(pack.path)}" role="button" tabindex="0" title="Click to expand/collapse asset pack details">
+            <div class="modCardTitleGroup">
+              <span class="modExpandIcon">▶</span>
+              <span class="modCardTitle">${escapeHtml(pack.name)}</span>
+              <span class="modBadgeCompact">${escapeHtml(pack.source === 'Managed Library' ? 'MANAGED' : 'FOLDER')}</span>
+              ${stagedLabel}
+            </div>
+            <button type="button" class="toggleModBtn ${isEffective ? 'enabled' : 'disabled'}" data-pack-path="${escapeHtml(pack.path)}" title="Click to stage activating this asset pack">
+              ${isEffective ? 'ACTIVE' : 'SELECT'}
+            </button>
+          </div>
+          <div class="modCardBody">
+            <div class="modCardDescription"><strong>Path:</strong> <code>${escapeHtml(pack.path)}</code></div>
+            <div class="modBadges">
+              <span class="modBadge modBadgeAuthor">Source: ${escapeHtml(pack.source)}</span>
+              <span class="modBadge">${isSaved ? 'Currently Loaded' : 'Available'}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    };
+
+    const renderAssetPackSupergroupHtml = (groupKey, title, list, emptyText) => {
+      const isGroupCollapsed = state.collapsedAssetPackGroups && state.collapsedAssetPackGroups.has(groupKey);
+      return `
+        <div class="modSupergroup ${isGroupCollapsed ? 'collapsed' : 'expanded'} modSupergroup--${groupKey}" data-group-key="${groupKey}">
+          <div class="modSupergroupHeader" data-group-key="${groupKey}" role="button" tabindex="0" aria-expanded="${!isGroupCollapsed}" title="Click to expand/collapse ${escapeHtml(title)}">
+            <div class="modSupergroupTitleGroup">
+              <span class="modGroupExpandIcon">▶</span>
+              <span class="modSupergroupTitle">${escapeHtml(title)}</span>
+            </div>
+            <span class="modGroupCount">${list.length}</span>
+          </div>
+          <div class="modSupergroupBody">
+            ${list.length === 0
+              ? `<p class="modGroupEmpty">${escapeHtml(emptyText)}</p>`
+              : list.map((pack) => renderAssetPackCardHtml(pack)).join('')}
+          </div>
+        </div>
+      `;
+    };
     const animEngine = window.RRWRAnimations;
     if (animEngine) {
       animEngine.normalizeSettings(settings);
@@ -4409,34 +4516,49 @@
       ? `CUSTOM (${animUiState.activeCount}/7)`
       : (animUiState.checked ? 'ON' : (animUiState.activeCount > 0 ? `CUSTOM (${animUiState.activeCount}/7)` : 'OFF'));
     const customModThemes = Array.isArray(state.modThemes) ? state.modThemes : [];
-    const assetPackReady = Boolean(state.appInfo && state.appInfo.asset_pack_ready);
     const isAndroid = isAndroidPlatform();
 
     container.innerHTML = `
       <div class="systemPageContainer">
         <h1 style="font-family: 'Courier Prime', 'Courier New', monospace;">SETTINGS &amp; PREFERENCES</h1>
 
-        <div class="settingsSectionCard assetSetupCard">
-          <h2>Asset Pack, Mods &amp; Custom Assets</h2>
-          <p>${assetPackReady ? 'Asset Pack V2 is connected.' : 'The app needs the extracted Asset Pack V2 folder before the collection can load.'}</p>
-          <p class="assetLocation"><strong>Asset Pack:</strong> ${escapeHtml((state.appInfo && state.appInfo.asset_dir) || 'not selected')}<br><strong>Custom asset overlay:</strong> ${escapeHtml((state.appInfo && state.appInfo.custom_asset_dir) || 'available after import')}</p>
-          <div class="assetSetupActions">
+        <div class="settingsSectionCard assetSetupCard" id="settings-asset-packs-card">
+          <div class="modsSectionHeader">
+            <h2>Asset Packs (${allAssetPacks.length})</h2>
+            <span class="modsHintTag">Select an asset pack below, then Apply &amp; Save to reload</span>
+          </div>
+          <p class="assetLocation"><strong>Active Asset Pack:</strong> ${escapeHtml((state.appInfo && state.appInfo.asset_dir) || 'not selected')}<br><strong>Custom asset overlay:</strong> ${escapeHtml((state.appInfo && state.appInfo.custom_asset_dir) || 'available after import')}</p>
+          <div class="assetSetupActions" style="margin-bottom: 12px;">
             <button type="button" id="import-asset-pack-zip">Import Asset Pack (.zip)</button>
             ${isAndroid ? `
               <button type="button" id="import-mod-zip" ${assetPackReady ? '' : 'disabled'}>Import mod ZIP</button>
               <button type="button" id="import-assets-zip">Import assets ZIP</button>
             ` : `
-              <button type="button" id="choose-asset-pack">${assetPackReady ? 'Change Asset Pack folder' : 'Choose Asset Pack V2 folder'}</button>
+              <button type="button" id="choose-asset-pack">Add Asset Pack Folder</button>
               <button type="button" id="import-mod-folder" ${assetPackReady ? '' : 'disabled'}>Import mod folder</button>
               <button type="button" id="import-mod-zip" ${assetPackReady ? '' : 'disabled'}>Import mod ZIP</button>
               <button type="button" id="import-assets-folder">Import assets folder</button>
               <button type="button" id="import-assets-zip">Import assets ZIP</button>
             `}
           </div>
-          <div id="managed-asset-packs-list" class="modsList" style="margin-top:10px;"></div>
+          <div id="asset-pack-pending-bar" class="modPendingBar ${pendingPackPath ? '' : 'hidden'}">
+            <div class="modPendingSummary">
+              <span class="modPendingBadge">1 PENDING</span>
+              <span id="asset-pack-pending-detail">${escapeHtml(pendingPackSummary)}</span>
+            </div>
+            <div class="modPendingActions">
+              <button type="button" id="discard-asset-pack-btn" class="modDiscardBtn">Discard</button>
+              <button type="button" id="apply-asset-pack-btn" class="modApplyBtn">Apply &amp; Save Asset Pack</button>
+            </div>
+          </div>
+          <div id="asset-packs-list">
+            ${allAssetPacks.length === 0
+              ? '<p style="font-size: 12px; color: #888;">No asset packs added yet. Import a .zip or add an extracted Asset Pack folder above.</p>'
+              : renderAssetPackSupergroupHtml('enabled', 'Active Asset Pack', activeAssetPacks, 'No active asset pack.') +
+                renderAssetPackSupergroupHtml('disabled', 'Available Asset Packs', availableAssetPacks, 'No other asset packs added.')}
+          </div>
           ${isAndroid ? renderAndroidAssetSectionHtml((state.appInfo && state.appInfo.asset_dir) || '') : ''}
           <p id="asset-import-status" class="assetImportStatus" role="status" aria-live="polite"></p>
-          <p class="assetSetupHelp">${isAndroid ? 'Select or enter the extracted Asset Pack V2 folder. Mods and custom assets can be imported from ZIP archives.' : 'Choose the already extracted Asset Pack V2 folder. The app keeps it untouched; imported replacement files live in a separate overlay. Mods can be imported from a folder or a ZIP archive.'}</p>
         </div>
 
         <!-- Section 1: Themes & Appearance -->
@@ -5055,7 +5177,10 @@
         const groupKey = groupHeader.getAttribute('data-group-key');
         const group = groupHeader.closest('.modSupergroup');
         if (!group) return;
+        const isAssetScope = Boolean(groupHeader.closest('#asset-packs-list'));
         if (!state.collapsedModGroups) state.collapsedModGroups = new Set();
+        if (!state.collapsedAssetPackGroups) state.collapsedAssetPackGroups = new Set();
+        const collapsedSet = isAssetScope ? state.collapsedAssetPackGroups : state.collapsedModGroups;
         const isNowExpanded = group.classList.contains('collapsed');
         const bodyEl = group.querySelector('.modSupergroupBody');
 
@@ -5067,9 +5192,9 @@
         group.classList.toggle('collapsed', !isNowExpanded);
         groupHeader.setAttribute('aria-expanded', String(isNowExpanded));
         if (isNowExpanded) {
-          state.collapsedModGroups.delete(groupKey);
+          collapsedSet.delete(groupKey);
         } else {
-          state.collapsedModGroups.add(groupKey);
+          collapsedSet.add(groupKey);
         }
 
         if (bodyEl && window.RRWRAnimations) {
@@ -5095,14 +5220,20 @@
       });
     });
 
-    // Community mod header click -> expand/collapse details and settings
+    // Mod / Asset Pack header click -> expand/collapse details
     const modHeaders = container.querySelectorAll('.modCardHeader');
     modHeaders.forEach((header) => {
       const toggleExpand = () => {
-        const modId = header.getAttribute('data-mod-id');
         const card = header.closest('.modCard');
         if (!card) return;
+        const isAssetCard = Boolean(card.closest('#asset-packs-list'));
+        const itemId = isAssetCard
+          ? header.getAttribute('data-pack-path')
+          : header.getAttribute('data-mod-id');
+        if (!itemId) return;
         if (!state.expandedMods) state.expandedMods = new Set();
+        if (!state.expandedAssetPacks) state.expandedAssetPacks = new Set();
+        const expandedSet = isAssetCard ? state.expandedAssetPacks : state.expandedMods;
         const wasExpanded = card.classList.contains('expanded');
         const isNowExpanded = !wasExpanded;
         const bodyEl = card.querySelector('.modCardBody');
@@ -5115,9 +5246,9 @@
         card.classList.toggle('expanded', isNowExpanded);
         card.classList.toggle('collapsed', !isNowExpanded);
         if (isNowExpanded) {
-          state.expandedMods.add(modId);
+          expandedSet.add(itemId);
         } else {
-          state.expandedMods.delete(modId);
+          expandedSet.delete(itemId);
         }
 
         if (bodyEl && window.RRWRAnimations) {
@@ -5148,8 +5279,97 @@
       });
     });
 
+    const syncAssetPackCardsDom = () => {
+      const pendingPath = (state.pendingAssetPackPath && state.pendingAssetPackPath !== activeAssetDir)
+        ? state.pendingAssetPackPath
+        : null;
+      const cards = container.querySelectorAll('#asset-packs-list .modCard');
+      cards.forEach((card) => {
+        const packPath = card.getAttribute('data-pack-path');
+        const pack = packMap.get(packPath);
+        const isSaved = Boolean(pack && pack.active);
+        const isEffective = pendingPath ? (pendingPath === packPath) : isSaved;
+        card.classList.toggle('modCard--staged-enable', !isSaved && isEffective);
+        card.classList.toggle('modCard--staged-disable', isSaved && !isEffective);
+
+        const stagedBadge = card.querySelector('.modStagedBadge');
+        if (stagedBadge) {
+          if (!isSaved && isEffective) {
+            stagedBadge.textContent = 'PENDING ON';
+            stagedBadge.className = 'modStagedBadge modStagedBadge--enable';
+          } else if (isSaved && !isEffective) {
+            stagedBadge.textContent = 'PENDING OFF';
+            stagedBadge.className = 'modStagedBadge modStagedBadge--disable';
+          } else {
+            stagedBadge.textContent = '';
+            stagedBadge.className = 'modStagedBadge hidden';
+          }
+        }
+
+        const btn = card.querySelector('.toggleModBtn');
+        if (btn) {
+          btn.classList.toggle('enabled', isEffective);
+          btn.classList.toggle('disabled', !isEffective);
+          btn.textContent = isEffective ? 'ACTIVE' : 'SELECT';
+        }
+      });
+
+      const pendingBar = container.querySelector('#asset-pack-pending-bar');
+      const pendingDetail = container.querySelector('#asset-pack-pending-detail');
+      if (pendingBar) {
+        pendingBar.classList.toggle('hidden', !pendingPath);
+      }
+      if (pendingDetail) {
+        const pObj = pendingPath ? packMap.get(pendingPath) : null;
+        pendingDetail.textContent = pObj ? `Switch to ${pObj.name}` : '';
+      }
+    };
+
+    container.querySelectorAll('#asset-packs-list .toggleModBtn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const packPath = btn.getAttribute('data-pack-path');
+        if (!packPath) return;
+        if (packPath === activeAssetDir || state.pendingAssetPackPath === packPath) {
+          state.pendingAssetPackPath = null;
+        } else {
+          state.pendingAssetPackPath = packPath;
+        }
+        syncAssetPackCardsDom();
+      });
+    });
+
+    const applyAssetPackBtn = container.querySelector('#apply-asset-pack-btn');
+    if (applyAssetPackBtn) {
+      applyAssetPackBtn.addEventListener('click', async () => {
+        const targetPath = state.pendingAssetPackPath;
+        if (!targetPath) return;
+        applyAssetPackBtn.disabled = true;
+        setAssetImportStatus(container, `Switching Asset Pack to ${targetPath} and reloading…`);
+        try {
+          await ipcInvoke('configure_asset_pack', { path: targetPath });
+          state.pendingAssetPackPath = null;
+          state.appInfo = await ipcInvoke('get_app_info');
+          if (state.appInfo && state.appInfo.asset_pack_ready) {
+            await initApp();
+          }
+        } catch (error) {
+          setAssetImportStatus(container, String(error), true);
+          applyAssetPackBtn.disabled = false;
+        }
+      });
+    }
+
+    const discardAssetPackBtn = container.querySelector('#discard-asset-pack-btn');
+    if (discardAssetPackBtn) {
+      discardAssetPackBtn.addEventListener('click', () => {
+        state.pendingAssetPackPath = null;
+        syncAssetPackCardsDom();
+      });
+    }
+
     // Community mod toggle buttons (stage into pending selection before Apply & Save)
-    const modBtns = container.querySelectorAll('.toggleModBtn');
+    const modBtns = container.querySelectorAll('#mods-list .toggleModBtn');
     modBtns.forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -5222,39 +5442,19 @@
   }
 
   function bindAssetSetupActions(container) {
-    const refreshManagedPacks = async () => {
-      const listEl = container.querySelector('#managed-asset-packs-list');
-      if (!listEl) return;
-      try {
-        const packs = await ipcInvoke('list_asset_packs');
-        if (!Array.isArray(packs) || packs.length === 0) {
-          listEl.innerHTML = '';
-          return;
-        }
-        listEl.innerHTML = packs.map((pack) => `
-          <label class="modRow" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="radio" name="active-asset-pack" value="${escapeHtml(pack.path)}" ${pack.active ? 'checked' : ''} />
-            <span><strong>${escapeHtml(pack.name)}</strong></span>
-          </label>
-        `).join('');
-        listEl.querySelectorAll('input[name="active-asset-pack"]').forEach((radio) => {
-          radio.addEventListener('change', async (e) => {
-            if (!e.target.checked) return;
-            try {
-              setAssetImportStatus(container, 'Switching Asset Pack and reloading…');
-              await ipcInvoke('configure_asset_pack', { path: e.target.value });
-              state.appInfo = await ipcInvoke('get_app_info');
-              if (state.appInfo && state.appInfo.asset_pack_ready) {
-                await initApp();
-              }
-            } catch (error) {
-              setAssetImportStatus(container, String(error), true);
-            }
-          });
-        });
-      } catch (_) {}
+    const rememberKnownAssetPack = (packPath) => {
+      const cleanPath = String(packPath || '').trim();
+      if (!cleanPath || !state.config || !state.config.settings) return;
+      const settings = state.config.settings;
+      if (!Array.isArray(settings.knownAssetPacks)) {
+        settings.knownAssetPacks = [];
+      }
+      if (!settings.knownAssetPacks.some((p) => p && p.path === cleanPath)) {
+        const name = cleanPath.split(/[\\/]/).filter(Boolean).pop() || cleanPath;
+        settings.knownAssetPacks.push({ name, path: cleanPath, source: 'Local Folder' });
+        persistConfig();
+      }
     };
-    refreshManagedPacks();
 
     const handleImportAssetPackZip = async () => {
       try {
@@ -5265,10 +5465,28 @@
           return;
         }
         setAssetImportStatus(container, 'Asset Pack imported! Reloading…');
+        state.pendingAssetPackPath = null;
         state.appInfo = await ipcInvoke('get_app_info');
         if (state.appInfo && state.appInfo.asset_pack_ready) {
           await initApp();
         }
+      } catch (error) {
+        setAssetImportStatus(container, String(error), true);
+      }
+    };
+
+    const handleAddAssetPackFolder = async () => {
+      try {
+        setAssetImportStatus(container, 'Select the extracted Asset Pack folder…');
+        const selected = await ipcInvoke('pick_asset_pack');
+        if (!selected) {
+          setAssetImportStatus(container, '');
+          return;
+        }
+        rememberKnownAssetPack(selected);
+        state.pendingAssetPackPath = selected;
+        await renderSettingsView(container);
+        setAssetImportStatus(container, 'Asset Pack folder added. Click "Apply & Save Asset Pack" to switch.');
       } catch (error) {
         setAssetImportStatus(container, String(error), true);
       }
@@ -5281,7 +5499,7 @@
 
     const choosePack = container.querySelector('#choose-asset-pack');
     if (choosePack) {
-      choosePack.addEventListener('click', handleImportAssetPackZip);
+      choosePack.addEventListener('click', handleAddAssetPackFolder);
     }
 
     const importButton = (selector, kind, command, resultLabel) => {
