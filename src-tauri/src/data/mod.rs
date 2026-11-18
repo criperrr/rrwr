@@ -142,6 +142,10 @@ impl ArchiveStore {
         self.story.get_range(start, count).await
     }
 
+    pub async fn get_reading_position(&self, page_id: &str) -> story::ReadingPosition {
+        self.story.get_reading_position(page_id).await
+    }
+
     pub fn get_music_raw(&self) -> serde_json::Value {
         (**self.music_raw.read().unwrap()).clone()
     }

@@ -457,8 +457,7 @@ pub async fn get_story_page(
     if state.0.config.read().await.settings.enable_discord_rpc {
         let _ = state
             .0
-            .discord_rpc
-            .update_reading_presence(&page.page_id, &page.title)
+            .sync_reading_discord_rpc(&page.page_id, None, Some(&page))
             .await;
     }
 
@@ -835,20 +834,10 @@ pub async fn set_discord_presence(
     match mode_str {
         "reading" => {
             let pid = page_id.unwrap_or_else(|| "000001".to_string());
-            let title = match page_title.or(title) {
-                Some(t) if !t.trim().is_empty() => t,
-                _ => state
-                    .0
-                    .store
-                    .get_story_page(&pid)
-                    .await
-                    .map(|p| p.title)
-                    .unwrap_or_else(|| "Reading".to_string()),
-            };
+            let title_override = page_title.or(title);
             Ok(state
                 .0
-                .discord_rpc
-                .update_reading_presence(&pid, &title)
+                .sync_reading_discord_rpc(&pid, title_override.as_deref(), None)
                 .await)
         }
         "browsing" | "menu" => {
