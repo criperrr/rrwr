@@ -166,6 +166,15 @@ pub fn run() {
 
             app.manage(AppState(inner));
 
+            // Explicitly set the runtime window icon on desktop platforms (fixes missing
+            // taskbar/Alt+Tab icon when running AppImage or standalone compiled binaries).
+            #[cfg(desktop)]
+            if let Some(window) = app.get_webview_window("main") {
+                if let Some(icon) = app.default_window_icon() {
+                    let _ = window.set_icon(icon.clone());
+                }
+            }
+
             // WebKitGTK memory optimization settings
             #[cfg(target_os = "linux")]
             {
