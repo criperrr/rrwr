@@ -48,6 +48,31 @@ pub struct StoryPageSummary {
     pub timestamp: String,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ReadingPosition {
+    pub position: usize,
+    pub total: usize,
+    pub division: Option<String>,
+    pub section: Option<String>,
+    pub chapter: Option<String>,
+}
+
+fn is_chapter_heading(title: &str) -> bool {
+    let lower = title.trim().to_ascii_lowercase();
+    const PREFIXES: &[&str] = &[
+        "act ",
+        "book ",
+        "chapter ",
+        "part ",
+        "section ",
+        "arc ",
+        "intermission",
+        "prologue",
+        "epilogue",
+    ];
+    PREFIXES.iter().any(|p| lower.starts_with(p))
+}
+
 fn default_theme() -> String {
     "default".to_string()
 }
@@ -486,6 +511,100 @@ impl StoryStore {
 
     pub async fn get_mod_home_row_items(&self) -> Vec<serde_json::Value> {
         self.mod_home_row_items.read().await.clone()
+    }
+
+    /// Resolves 1-based reading position, total pages, section, and nearest preceding chapter heading.
+    pub async fn get_reading_position(&self, page_id: &str) -> ReadingPosition {
+        let idx_arc = self.index.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let base = self.base.read().unwrap_or_else(|e| e.into_inner()).clone();
+
+        let total = idx_arc.order.len();
+        if let Some(&pos_idx) = idx_arc.position_map.get(page_id) {
+            let current_root = base
+                .story
+                .get(page_id)
+                .and_then(crate::data::tree::extract_media_root);
+
+            let (position, div_total, division, chapter_start_idx) = if let Some(ref root) =
+                current_root
+            {
+                let mut div_indices = idx_arc.order.iter().enumerate().filter_map(|(i, k)| {
+                    let p = base.story.get(k)?;
+                    if crate::data::tree::extract_media_root(p).as_deref() == Some(root.as_str()) {
+                        Some((i, p))
+                    } else {
+                        None
+                    }
+                });
+
+                let mut div_pos = 0usize;
+                let mut count = 0usize;
+                let mut div_label: Option<String> = None;
+                let mut first_idx = 0usize;
+
+                if let Some((fi, fp)) = div_indices.next() {
+                    first_idx = fi;
+                    count = 1;
+                    if fi == pos_idx {
+                        div_pos = 1;
+                    }
+                    let t = fp.title.trim();
+                    if !t.is_empty() && t != "==>" {
+                        div_label = Some(t.to_string());
+                    }
+                    for (i, _) in div_indices {
+                        count += 1;
+                        if i == pos_idx {
+                            div_pos = count;
+                        }
+                    }
+                }
+
+                if div_pos > 0 && count > 0 {
+                    (div_pos, count, div_label, first_idx)
+                } else {
+                    (pos_idx + 1, total, div_label, 0)
+                }
+            } else {
+                (pos_idx + 1, total, None, 0)
+            };
+
+            let chapter = (chapter_start_idx..=pos_idx)
+                .rev()
+                .filter_map(|i| idx_arc.order.get(i))
+                .filter_map(|k| base.story.get(k))
+                .map(|p| p.title.trim())
+                .find(|title| is_chapter_heading(title))
+                .map(str::to_string);
+
+            return ReadingPosition {
+                position,
+                total: div_total,
+                division,
+                section: None,
+                chapter,
+            };
+        }
+
+        let section = if base.extra_stories.contains_key(page_id) {
+            Some("Extra Stories".to_string())
+        } else if base.bonus_pages.contains_key(page_id) {
+            Some("Bonus Pages".to_string())
+        } else if base.alt_stories.contains_key(page_id) {
+            Some("Alt Stories".to_string())
+        } else if base.faqs.contains_key(page_id) {
+            Some("FAQ".to_string())
+        } else {
+            None
+        };
+
+        ReadingPosition {
+            position: 0,
+            total,
+            division: None,
+            section,
+            chapter: None,
+        }
     }
 
     pub async fn reset_to_base(&self) {

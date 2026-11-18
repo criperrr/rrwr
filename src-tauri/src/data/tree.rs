@@ -243,7 +243,7 @@ fn build_story_range_nodes(
     nodes
 }
 
-fn extract_media_root(page: &StoryPage) -> Option<String> {
+pub(crate) fn extract_media_root(page: &StoryPage) -> Option<String> {
     let raw = page.media.iter().find(|m| !m.trim().is_empty())?;
     let trimmed = raw
         .trim()

@@ -80,6 +80,39 @@ pub struct DiscordRpcManager {
     tx: mpsc::Sender<RpcCommand>,
 }
 
+/// Built-in Discord Application ID used when no custom ID is configured.
+pub const DEFAULT_DISCORD_CLIENT_ID: &str = "1568232968214945812";
+
+fn resolve_client_id(custom_client_id: Option<&str>) -> String {
+    custom_client_id
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(DEFAULT_DISCORD_CLIENT_ID)
+        .to_string()
+}
+
+/// Optional metadata enriching the Discord reading Rich Presence display.
+#[derive(Debug, Clone, Default)]
+pub struct ReadingPresenceContext {
+    pub pack_name: Option<String>,
+    pub division: Option<String>,
+    pub chapter: Option<String>,
+    pub section: Option<String>,
+    pub position: usize,
+    pub total: usize,
+    pub media_kind: Option<String>,
+    pub theme: Option<String>,
+}
+
+fn clamp_rpc_field(value: String, max_chars: usize) -> String {
+    if value.chars().count() <= max_chars {
+        return value;
+    }
+    let mut out: String = value.chars().take(max_chars.saturating_sub(3)).collect();
+    out.push_str("...");
+    out
+}
+
 /// Resolves a page_id to its generic `(status_label, icon_key)` pair.
 pub fn resolve_story_chapter(page_id: &str) -> (&'static str, &'static str) {
     let _ = page_id;
@@ -626,10 +659,7 @@ impl DiscordRpcManager {
 
         #[cfg(not(target_os = "android"))]
         {
-            let client_id = custom_client_id
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .unwrap_or_default();
+            let client_id = resolve_client_id(custom_client_id.as_deref());
 
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -707,7 +737,7 @@ impl DiscordRpcManager {
 
         #[cfg(not(target_os = "android"))]
         {
-            let target_id = client_id.trim().to_string();
+            let target_id = resolve_client_id(Some(client_id));
             {
                 let mut guard = self.inner.write().await;
                 guard.client_id = target_id.clone();
@@ -734,16 +764,110 @@ impl DiscordRpcManager {
     }
 
     pub async fn update_reading_presence(&self, page_id: &str, page_title: &str) -> DiscordStatus {
+        self.update_reading_presence_with_context(
+            page_id,
+            page_title,
+            ReadingPresenceContext::default(),
+        )
+        .await
+    }
+
+    /// Updates Discord Rich Presence with what is being read, reading progress, and page metadata.
+    pub async fn update_reading_presence_with_context(
+        &self,
+        page_id: &str,
+        page_title: &str,
+        ctx: ReadingPresenceContext,
+    ) -> DiscordStatus {
         #[cfg(target_os = "android")]
-        return self.get_status().await;
+        {
+            let _ = (page_id, page_title, ctx);
+            return self.get_status().await;
+        }
 
         #[cfg(not(target_os = "android"))]
         {
-            let (chapter, icon_key) = resolve_story_chapter(page_id);
-            let state_text = if page_title.trim().is_empty() {
-                format!("Page {}", page_id)
+            let (fallback_label, icon_key) = resolve_story_chapter(page_id);
+            let clean_title = page_title.trim();
+            let clean_pack = ctx
+                .pack_name
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty());
+            let clean_division = ctx
+                .division
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty());
+            let location_label = ctx
+                .chapter
+                .as_deref()
+                .or(ctx.section.as_deref())
+                .map(str::trim)
+                .filter(|s| !s.is_empty());
+
+            let has_rich_ctx = clean_pack.is_some()
+                || clean_division.is_some()
+                || location_label.is_some()
+                || (ctx.position > 0 && ctx.total > 0);
+
+            let (details_raw, state_raw) = if has_rich_ctx {
+                let target_label = clean_division
+                    .or(ctx
+                        .section
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty()))
+                    .or_else(|| (!clean_title.is_empty()).then_some(clean_title));
+                let det = match (target_label, clean_pack) {
+                    (Some(target), Some(pack)) => format!("Reading {} from {}", target, pack),
+                    (Some(target), None) => format!("Reading {}", target),
+                    (None, Some(pack)) => format!("Reading from {}", pack),
+                    (None, None) => format!("{} Page {}", fallback_label, page_id),
+                };
+                let progress_part = if ctx.position > 0 && ctx.total > 0 {
+                    let pct = ((ctx.position as f64 / ctx.total as f64) * 100.0).round() as usize;
+                    format!("Page {}/{} ({}%)", ctx.position, ctx.total, pct)
+                } else {
+                    format!("Page {}", page_id)
+                };
+                let st = match location_label {
+                    Some(loc) => format!("{} | {}", loc, progress_part),
+                    None => progress_part,
+                };
+                (det, st)
             } else {
-                format!("{} (Page {})", page_title.trim(), page_id)
+                let st = if clean_title.is_empty() {
+                    format!("Page {}", page_id)
+                } else {
+                    format!("{} (Page {})", clean_title, page_id)
+                };
+                (fallback_label.to_string(), st)
+            };
+
+            let mut hover_parts: Vec<String> = Vec::new();
+            if let Some(loc) = location_label {
+                hover_parts.push(loc.to_string());
+            }
+            if let Some(kind) = ctx
+                .media_kind
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
+                hover_parts.push(kind.to_string());
+            }
+            hover_parts.push(format!("Page {}", page_id));
+            let large_image_text = clamp_rpc_field(hover_parts.join(" | "), 128);
+
+            let small_image_text = match ctx
+                .theme
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty() && *s != "default")
+            {
+                Some(theme) => clamp_rpc_field(format!("RRWR ({})", theme), 128),
+                None => "RRWR Desktop".to_string(),
             };
 
             let activity = {
@@ -751,12 +875,12 @@ impl DiscordRpcManager {
                 guard.nonce_counter = guard.nonce_counter.saturating_add(1);
                 let act = DiscordActivity {
                     activity_type: "reading".to_string(),
-                    details: chapter.to_string(),
-                    state: state_text,
+                    details: clamp_rpc_field(details_raw, 128),
+                    state: clamp_rpc_field(state_raw, 128),
                     large_image_key: icon_key.to_string(),
-                    large_image_text: chapter.to_string(),
+                    large_image_text,
                     small_image_key: "reader".to_string(),
-                    small_image_text: "RRWR".to_string(),
+                    small_image_text,
                     start_timestamp: guard.session_start,
                     page_id: Some(page_id.to_string()),
                     track_id: None,
@@ -1282,5 +1406,36 @@ mod tests {
             "Must successfully connect to Serein after bypassing dead socket"
         );
         server_task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_update_reading_presence_with_rich_context() {
+        let rpc = DiscordRpcManager::new(false, None);
+        let status = rpc
+            .update_reading_presence_with_context(
+                "000250",
+                "Enter the Medium",
+                ReadingPresenceContext {
+                    pack_name: Some("MyComicPack".to_string()),
+                    division: Some("Main Story".to_string()),
+                    chapter: Some("Act 2".to_string()),
+                    section: None,
+                    position: 250,
+                    total: 1000,
+                    media_kind: Some("Interactive Flash".to_string()),
+                    theme: Some("cascade".to_string()),
+                },
+            )
+            .await;
+
+        let act = status.activity.expect("activity must be populated");
+        assert_eq!(act.details, "Reading Main Story from MyComicPack");
+        assert_eq!(act.state, "Act 2 | Page 250/1000 (25%)");
+        assert_eq!(
+            act.large_image_text,
+            "Act 2 | Interactive Flash | Page 000250"
+        );
+        assert_eq!(act.small_image_text, "RRWR (cascade)");
+        assert_eq!(act.page_id.as_deref(), Some("000250"));
     }
 }

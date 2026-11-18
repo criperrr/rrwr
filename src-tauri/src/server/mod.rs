@@ -38,6 +38,74 @@ impl AppStateInner {
     pub fn asset_dir(&self) -> PathBuf {
         self.asset_dir.read().unwrap().clone()
     }
+
+    /// Updates Discord Rich Presence with enriched reading progress and media context.
+    pub async fn sync_reading_discord_rpc(
+        &self,
+        page_id: &str,
+        page_title_override: Option<&str>,
+        page: Option<&crate::data::story::StoryPage>,
+    ) -> crate::rpc::DiscordStatus {
+        let fetched_page = match page {
+            Some(p) => Some(p.clone()),
+            None => self.store.get_story_page(page_id).await,
+        };
+        let title = page_title_override
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .or_else(|| fetched_page.as_ref().map(|p| p.title.clone()))
+            .unwrap_or_else(|| "Reading".to_string());
+
+        let pos = self.store.get_reading_position(page_id).await;
+        let pack_name = self
+            .asset_dir()
+            .file_name()
+            .map(|n| n.to_string_lossy().trim().to_string())
+            .filter(|s| !s.is_empty());
+
+        let media_kind = fetched_page.as_ref().map(classify_page_media);
+        let theme = fetched_page.as_ref().and_then(|p| p.theme.clone());
+
+        self.discord_rpc
+            .update_reading_presence_with_context(
+                page_id,
+                &title,
+                crate::rpc::ReadingPresenceContext {
+                    pack_name,
+                    division: pos.division,
+                    chapter: pos.chapter,
+                    section: pos.section,
+                    position: pos.position,
+                    total: pos.total,
+                    media_kind,
+                    theme,
+                },
+            )
+            .await
+    }
+}
+
+fn classify_page_media(page: &crate::data::story::StoryPage) -> String {
+    if page.flag.iter().any(|f| f == "F") {
+        return "Interactive Flash".to_string();
+    }
+    if page.flag.iter().any(|f| f == "S") {
+        return "Special Page".to_string();
+    }
+    if let Some(first) = page.media.first() {
+        let lower = first.to_ascii_lowercase();
+        if lower.ends_with(".swf") {
+            return "Flash Animation".to_string();
+        }
+        if lower.ends_with(".mp4") || lower.ends_with(".webm") {
+            return "Video".to_string();
+        }
+        if lower.ends_with(".gif") {
+            return "Animated Panel".to_string();
+        }
+    }
+    "Comic Panel".to_string()
 }
 
 pub struct AssetServerHandle {
@@ -455,8 +523,7 @@ pub async fn dispatch_ipc(
                 Some(page) => {
                     if state.config.read().await.settings.enable_discord_rpc {
                         let _ = state
-                            .discord_rpc
-                            .update_reading_presence(&page.page_id, &page.title)
+                            .sync_reading_discord_rpc(&page.page_id, None, Some(&page))
                             .await;
                     }
                     match serde_json::to_value(&page) {
@@ -917,25 +984,14 @@ pub async fn dispatch_ipc(
             match mode {
                 "reading" => {
                     let page_id = parse_page_id_arg(args).unwrap_or_else(|| "000001".to_string());
-                    let page_title = if let Some(t) = args
+                    let page_title_override = args
                         .get("page_title")
                         .or_else(|| args.get("pageTitle"))
                         .or_else(|| args.get("title"))
-                        .and_then(|v| v.as_str())
-                    {
-                        t.to_string()
-                    } else {
-                        state
-                            .store
-                            .get_story_page(&page_id)
-                            .await
-                            .map(|p| p.title)
-                            .unwrap_or_else(|| "Reading".to_string())
-                    };
+                        .and_then(|v| v.as_str());
 
                     let status = state
-                        .discord_rpc
-                        .update_reading_presence(&page_id, &page_title)
+                        .sync_reading_discord_rpc(&page_id, page_title_override, None)
                         .await;
                     json_response(
                         StatusCode::OK,
